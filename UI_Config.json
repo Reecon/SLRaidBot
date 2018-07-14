@@ -1,0 +1,32 @@
+﻿{
+    "MinViewers": {
+        "group": "Core", 
+        "label": "Minimum Viewers", 
+        "tooltip": "The minimum viweres a raid or host must have to be tracked", 
+        "type": "numberbox", 
+        "value": 10
+    }, 
+    "NewTarget": {
+        "group": "Targets", 
+        "label": "New Target Names", 
+        "tooltip": "Username of new raid target (supports multiple targets seperated by space)", 
+        "type": "textbox", 
+        "value": ""
+    }, 
+    "autohosts": {
+        "group": "Core", 
+        "label": "Track Autohosts", 
+        "tooltip": "Track autohosts as well as manual hosts", 
+        "type": "checkbox", 
+        "value": false
+    }, 
+    "btnOpen": {
+        "function": "OpenWebsite", 
+        "group": "Core", 
+        "label": "Open Web UI", 
+        "tooltip": "Opens the web ui", 
+        "type": "button", 
+        "wsevent": "EVENT_NONE"
+    }, 
+    "output_file": "Settings/settings.json"
+}

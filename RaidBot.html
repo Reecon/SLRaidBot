@@ -1,0 +1,193 @@
+<html>
+<head>
+  <meta charset="UTF-8"> 
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.2/css/bootstrap.min.css" integrity="sha384-Smlep5jCw/wG7hdkwQ/Z5nLIefveQRIY9nfy6xoR1uRYBtpZgI6339F5dgvm/e9B" crossorigin="anonymous">
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.2/js/bootstrap.min.js" integrity="sha384-o+RDsa0aLu++PJvFqy8fFScvbHFLtbvScb8AjopnFD+iEQ7wo/CG0xlczd+2O/em" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.5.16/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue-resource@1.5.1"></script>
+  <script src="API_Key.js"></script>
+  <title>Raid Bot</title>
+</head>
+<body>
+  <div id="app">
+    <div class="container-fluid">
+      <div class="accordion" id="accordionExample">
+          <div class="card" v-for="(item, i) in raidData">
+            <div class="card-header" :id="'heading'+item.name">
+              <h5 class="mb-0">
+                <button class="btn btn-link collapsed btn-block" type="button" data-toggle="collapse" :data-target="'#' + item.name" aria-expanded="false" :aria-controls="item.name">
+                    <span style="float: left;">{{ item.name }}</span>
+                    <span v-if="item.status != 'offline'" style="float:left; margin-left:1em; color: green; font-weight: bold;">{{ item.status }}</span>
+                    <span style="float: right;padding-right: 1em; padding-left: 1em">we raided: {{ item.weraided.length }}</span>
+                    <span style="float: right;padding-left: 1em;padding-right: 1em;">raids: {{ item.raids.length }}</span>
+                    <span v-if="item.lastraided" style="float:right; margin-right:1em;">{{(new Date(item.lastraided * 1000)).toDateString()}}</span>
+                </button>
+              </h5>
+            </div>
+        
+            <div :id="item.name" class="collapse" :aria-labelledby="'heading'+item.name" data-parent="#accordionExample">
+              <div class="card-body">
+                <!-- <p v-if="item.weraided.length > 0">Last 5 raids by us:</p> -->
+                <ul class="list-group" v-for="(raid, i) in item.weraided">
+                  <li v-if="i < 5" class="list-group-item" style="background-color: lightblue">Type: {{raid.type}} - Viewer: {{raid.viewers}} - Date: {{(new Date(raid.date * 1000)).toDateString()}}</li>
+                </ul>
+                <!-- <p v-if="item.raids.length > 0"><br>Last 5 raids by them:</p> -->
+                <ul class="list-group" v-for="(raid, i) in item.raids">
+                    <li v-if="i < 5" class="list-group-item" style="background-color: rgb(153, 240, 255)">Type: {{raid.type}} - Viewer: {{raid.viewers}} - Date: {{(new Date(raid.date * 1000)).toDateString()}}</li>
+                  </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+    </div>
+  </div>
+</body>
+
+
+<script>
+  var vm = new Vue({
+    el: '#app',
+    data: {
+      raidData: [],
+      client_id: "",
+      my_event: "",
+      serviceUrl: "",
+      socket: Object
+    },
+    watch: {
+      raidData: function () {
+        var chanIds = "";
+        for (i in this.raidData) {
+          chanIds += this.raidData[i].userid + ',';
+        }
+        chanIds.slice(0,-1);
+        var url = 'https://api.twitch.tv/kraken/streams/?channel=' + chanIds;
+        console.log("url", url);
+        this.$http.get(url, {
+          headers: {'Accept': 'application/vnd.twitchtv.v5+json', 'Client-ID': this.client_id}
+        })
+        .then((response) => {
+          //console.log("body", response.body);
+          for (stream in response.body.streams) {
+            console.log("stream", response.body.streams[stream]);
+            var game = response.body.streams[stream].game;
+            var viewers = response.body.streams[stream].viewers;
+            var type = response.body.streams[stream].stream_type;
+            var chanId = response.body.streams[stream].channel._id;
+            
+            var status = type + " - " + game + " - for " + viewers + " viewers";
+
+            for (i in this.raidData) {
+              if (this.raidData[i].userid === chanId) {
+                this.raidData[i].status = status
+                break;
+              }
+            }
+          }
+        })
+        .catch((err) => {
+          console.log("api access error", err);
+        });
+      }
+    },
+    mounted: function () {
+      //---------------------------------
+      //  Variables
+      //---------------------------------
+      this.serviceUrl = API_Socket;
+      this.socket = new WebSocket(this.serviceUrl);
+
+      //---------------------------------
+      //  Open Event
+      //---------------------------------
+      this.socket.onopen = function () {
+        // Format your Authentication Information
+        var auth = {
+          author: 'Reecon820',
+          website: 'reecon820@gmail.com',
+          api_key: API_Key,
+          events: ['EVENT_RAID_DATA']
+        };
+
+        //  Send your Data to the server
+        vm.socket.send(JSON.stringify(auth));
+      };
+
+      //---------------------------------
+      //  Error Event
+      //---------------------------------
+      this.socket.onerror = function (error) {
+        //  Something went terribly wrong... Respond?!
+        console.log('Error: ' + error);
+      };
+
+      //---------------------------------
+      //  Message Event
+      //---------------------------------
+      this.socket.onmessage = function (message) {
+        var json = JSON.parse(message.data);
+
+        if(json.event == 'EVENT_RAID_DATA') {
+          
+          var jsonString = json.data;
+          
+          var jsonData = JSON.parse(jsonString);
+          vm.client_id = jsonData.client_id;
+          
+          // this is soooo stupid, please halp
+          var raidsArray = [];
+          for (i in jsonData) {
+            if (i != 'client_id') {
+              var obj = {};
+              obj['name'] = i;
+              obj['userid'] = jsonData[i].userid;
+              obj['lastraid'] = jsonData[i].lastraid;
+              obj['lastraided'] = jsonData[i].lastraided;
+
+              var raided = [];
+              for (raid in jsonData[i].weraided) {
+                var r = {};
+                r['date'] = jsonData[i].weraided[raid].date;
+                r['type'] = jsonData[i].weraided[raid].type;
+                r['viewers'] = jsonData[i].weraided[raid].viewers;
+                raided.push(r);
+              }
+              obj['weraided'] = raided;
+
+              var raids = [];
+              for (raid in jsonData[i].raids) {
+                var r = {};
+                r['date'] = jsonData[i].raids[raid].date;
+                r['type'] = jsonData[i].raids[raid].type;
+                r['viewers'] = jsonData[i].raids[raid].viewers;
+                raids.push(r);
+              }
+              obj['raids'] = raids;
+
+              obj['status'] = "offline";
+
+              raidsArray.push(obj);
+            }
+          }
+
+          raidsArray.sort((a, b) => {return a.lastraided - b.lastraided});
+
+          vm.raidData = raidsArray;
+        }
+      };
+      
+      //---------------------------------
+      //  Message Event
+      //---------------------------------
+      this.socket.onclose = function () {
+        //  Connection has been closed by you or the server
+        console.log("Connection Closed!");
+      };
+    }
+  });
+</script>
+
+</html>
