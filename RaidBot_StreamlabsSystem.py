@@ -69,7 +69,7 @@ def Init():
     # update ui with loaded settings
     ui['MinViewers']['value'] = ScriptSettings.MinViewers
     ui['NewTarget']['value'] = ScriptSettings.NewTarget
-    ui['autohosts']['value'] = ScriptSettings.autohosts
+    ui['RemoveTarget']['value'] = ScriptSettings.RemoveTarget
 
     try:
         with codecs.open(UiFilePath, encoding="utf-8-sig", mode="w+") as f:
@@ -95,9 +95,6 @@ def Init():
 def Execute(data):
     
     if data.IsRawData():
-        stringdata = "{0}".format(data.RawData)
-        Parent.Log(ScriptName, stringdata)
-        
         if "USERNOTICE" in data.RawData: # we get raided
             if "msg-id=raid" in data.RawData:
                 # get raiding channel and viewers
@@ -112,7 +109,7 @@ def Execute(data):
             tokens = data.RawData.split(" ")
             targetname = tokens[3][1:]
             viewercount = int(tokens[4])
-            Parent.Log(ScriptName, "target: {0} - viwers: {1}".format(targetname, viewercount))
+            Parent.Log(ScriptName, "target: {0} - viewers: {1}".format(targetname, viewercount))
 
             if targetname != '-':
                 addTargetByName(targetname)
@@ -123,14 +120,23 @@ def Execute(data):
             
             message = data.RawData
 
-            if re.search(":jtv.*:.*is\snow\shosting\syou", message) or (ScriptSettings.autohosts and re.search(":jtv.*:.*is\snow\sauto\shosting\syou", message)):
-                Parent.Log(ScriptName, "got hosted")
+            if re.search(":jtv.*:.*is\snow\shosting\syou", message): # or (ScriptSettings.autohosts and re.search(":jtv.*:.*is\snow\sauto\shosting\syou", message)):
                 
-                hostername = message.split(":")[1][1]
-                Parent.Log(ScriptName, "hostername: {0}".format(hostername))
+                Parent.Log(ScriptName, "got hosted: {}".format(message))
 
-                hosterid = getUserId(hostername)
-                Parent.Log(ScriptName, "hosterid: {0}".format(hosterid))
+                hostType = "host" if re.search(":jtv.*:.*is\snow\shosting\syou", message) else "autohost"
+                hostStringTokens = message.split(":")[2].split(" ")
+                hostername = hostStringTokens[0]
+                viewers = 0
+                if hostType == "host":
+                    viewers = int(hostStringTokens[9]) if len(hostStringTokens) > 5 else 0
+                else:
+                    viewers = int(hostStringTokens[10]) if len(hostStringTokens) > 5 else 0
+
+                Parent.Log(ScriptName, "{0} {2} for {1} viewers".format(hostername, viewers, hostType))
+
+                addTargetByName(hostername)
+                addRaid(hostername, hostType, viewers)
 
         # we raid someone
 
@@ -154,8 +160,12 @@ def Parse(parseString, userid, username, targetid, targetname, message):
 def ReloadSettings(jsonData):
     # Execute json reloading here
     jsonDict = json.loads(jsonData, encoding="utf-8")
+    for target in jsonDict['RemoveTarget'].split(" "):
+        removeTargetByName(target)
     for target in jsonDict['NewTarget'].split(" "):
         addTargetByName(target)
+
+    loadDatabase()
     
     ScriptSettings.Reload(jsonData)
     ScriptSettings.Save(SettingsFile)
@@ -179,7 +189,7 @@ def OpenWebsite():
     data = RaidsData
     data['client_id'] = ClientID 
     dataString = json.dumps(data,indent=None)
-    time.sleep(1) # wait till ui is loaded and connected
+    time.sleep(2) # wait till ui is loaded and connected
     Parent.BroadcastWsEvent("EVENT_RAID_DATA", dataString)
     return
 
@@ -250,7 +260,7 @@ def addTargetByName(targetname):
         c.execute('INSERT OR IGNORE INTO targets (userid, username) VALUES({0}, "{1}")'.format(targetid, targetname))
         conn.commit()
     except Exception as err:
-        Parent.Log(ScriptName, "{0}".format(err))
+        Parent.Log(ScriptName, "Error adding target by name: {0}".format(err))
         
     conn.close()
     return
@@ -266,10 +276,25 @@ def addTargetByIdAndName(targetid, targetname):
         c.execute('INSERT OR IGNORE INTO targets (userid, username) VALUES({0}, "{1}")'.format(targetid, targetname))
         conn.commit()
     except Exception as err:
-        Parent.Log(ScriptName, "{0}".format(err))
+        Parent.Log(ScriptName, "Error adding target by ID and Name: {0}".format(err))
     
     conn.close()
     return
+
+def removeTargetByName(targetname):
+    if (not targetname):
+        return
+    
+    conn = sqlite3.connect(Database)
+    c = conn.cursor()
+
+    try:
+        c.execute('DELETE FROM targets WHERE username like "{}"'.format(targetname))
+        c.execute('DELETE FROM raids WHERE username like "{}"'.format(targetname))
+        c.execute('DELETE FROM weraided WHERE username like "{}"'.format(targetname))
+        conn.commit()
+    except Exception as err:
+        Parent.Log(ScriptName, "Error removing target: {}".format(err))
 
 # to add raids when we get raiaded / hosted
 def addRaid(targetname, raidtype, viewers, timestamp="now", targetid=None):
@@ -285,7 +310,7 @@ def addRaid(targetname, raidtype, viewers, timestamp="now", targetid=None):
 
         c.execute('INSERT OR REPLACE INTO targets (userid, username, lastraid) VALUES({0}, "{1}", {2})'.format(userid, targetname, timestamp))
     except Exception as err:
-        Parent.Log(ScriptName, "{0}".format(err))
+        Parent.Log(ScriptName, "Error adding raid: {0}".format(err))
 
     conn.commit()
     conn.close()    
@@ -305,7 +330,7 @@ def addWeRaided(targetname, raidtype, viewers, timestamp="now", targetid=None):
 
         c.execute('INSERT OR REPLACE INTO targets (userid, username, lastraided) VALUES({0}, "{1}", {2})'.format(userid, targetname, timestamp))
     except Exception as err:
-        Parent.Log(ScriptName, "{0}".format(err))
+        Parent.Log(ScriptName, "Error adding 'we raided': {0}".format(err))
     conn.commit()
     conn.close()
     return
@@ -317,7 +342,7 @@ def getUserId(username):
     jsonResult = json.loads(result)
 
     if jsonResult['status'] != 200:
-        Parent.Log(ScriptName, "{0}".format(jsonResult))
+        Parent.Log(ScriptName, "Error making API request: {0}".format(jsonResult))
         return
     else:
         jsonResult = json.loads(jsonResult['response'])
