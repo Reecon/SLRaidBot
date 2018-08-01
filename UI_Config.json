@@ -13,12 +13,12 @@
         "type": "textbox", 
         "value": ""
     }, 
-    "autohosts": {
-        "group": "Core", 
-        "label": "Track Autohosts", 
-        "tooltip": "Track autohosts as well as manual hosts", 
-        "type": "checkbox", 
-        "value": false
+    "RemoveTarget": {
+        "group": "Targets", 
+        "label": "Remove Target Names", 
+        "tooltip": "Username of raid target to be removed (supports multiple targets seperated by space)", 
+        "type": "textbox", 
+        "value": ""
     }, 
     "btnOpen": {
         "function": "OpenWebsite", 

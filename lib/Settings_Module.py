@@ -9,8 +9,8 @@ class MySettings(object):
 				self.__dict__ = json.load(f, encoding="utf-8")
 		except:
 			self.MinViewers = 10
-			self.autohosts = False
-		self.NewTarget = ""
+			self.NewTarget = ""
+			self.RemoveTarget = ""
 
 	def Reload(self, jsondata):
 		self.__dict__ = json.loads(jsondata, encoding="utf-8")
