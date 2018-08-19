@@ -15,8 +15,6 @@ clr.AddReference("IronPython.SQLite.dll")
 clr.AddReference("IronPython.Modules.dll")
 import sqlite3
 
-#   Import your Settings class
-from Settings_Module import MySettings
 #---------------------------
 #   [Required] Script Information
 #---------------------------
@@ -24,24 +22,50 @@ ScriptName = "RaidBot"
 Website = "reecon820@gmail.com"
 Description = "Logs raids and hosts so you can keep track of"
 Creator = "Reecon820"
-Version = "0.0.1.0"
+Version = "0.0.2.0"
+
+#---------------------------
+#   Settings Handling
+#---------------------------
+class RbSettings:
+	def __init__(self, settingsfile=None):
+		try:
+			with codecs.open(settingsfile, encoding="utf-8-sig", mode="r") as f:
+				self.__dict__ = json.load(f, encoding="utf-8")
+		except:
+			self.MinViewers = 10
+			self.NewTarget = ""
+			self.RemoveTarget = ""
+
+	def Reload(self, jsondata):
+		self.__dict__ = json.loads(jsondata, encoding="utf-8")
+
+	def Save(self, settingsfile):
+		try:
+			with codecs.open(settingsfile, encoding="utf-8-sig", mode="w+") as f:
+				json.dump(self.__dict__, f, encoding="utf-8")
+			with codecs.open(settingsfile.replace("json", "js"), encoding="utf-8-sig", mode="w+") as f:
+				f.write("var settings = {0};".format(json.dumps(self.__dict__, encoding='utf-8')))
+		except:
+			Parent.Log(ScriptName, "Failed to save settings to file.")
 
 #---------------------------
 #   Define Global Variables
 #---------------------------
-global SettingsFile
-SettingsFile = ""
-global ScriptSettings
-ScriptSettings = MySettings()
+global rbSettingsFile
+rbSettingsFile = ""
+global rbScriptSettings
+rbScriptSettings = RbSettings()
 
-global HtmlPath
-HtmlPath = os.path.abspath(os.path.join(os.path.dirname(__file__), "RaidBot.html"))
+global rbHtmlPath
+rbHtmlPath = os.path.abspath(os.path.join(os.path.dirname(__file__), "RaidBot.html"))
 
-global Database
-Database = os.path.join(os.path.dirname(__file__), "raids.db")
+global rbDatabase
+rbDatabase = os.path.join(os.path.dirname(__file__), "raids.db")
 
-global ClientID
-ClientID = None
+global rbClientID
+rbClientID = None
+
 #---------------------------
 #   [Required] Initialize Data (Only called on load)
 #---------------------------
@@ -53,37 +77,20 @@ def Init():
         os.makedirs(directory)
 
     #   Load settings
-    global SettingsFile
-    SettingsFile = os.path.join(os.path.dirname(__file__), "Settings\settings.json")
-    global ScriptSettings
-    ScriptSettings = MySettings(SettingsFile)
-
-    ui = {}
-    UiFilePath = os.path.join(os.path.dirname(__file__), "UI_Config.json")
-    try:
-        with codecs.open(UiFilePath, encoding="utf-8-sig", mode="r") as f:
-            ui = json.load(f, encoding="utf-8")
-    except Exception as err:
-        Parent.Log(ScriptName, "{0}".format(err))
-
-    # update ui with loaded settings
-    ui['MinViewers']['value'] = ScriptSettings.MinViewers
-    ui['NewTarget']['value'] = ScriptSettings.NewTarget
-    ui['RemoveTarget']['value'] = ScriptSettings.RemoveTarget
-
-    try:
-        with codecs.open(UiFilePath, encoding="utf-8-sig", mode="w+") as f:
-            json.dump(ui, f, encoding="utf-8", indent=4, sort_keys=True)
-    except Exception as err:
-        Parent.Log(ScriptName, "{0}".format(err))
+    global rbSettingsFile
+    rbSettingsFile = os.path.join(os.path.dirname(__file__), "Settings\settings.json")
+    global rbScriptSettings
+    rbScriptSettings = RbSettings(rbSettingsFile)
 
     loadDatabase()
+
+    updateUi()
 
     # read client id for api access from file
     try:
         with codecs.open(os.path.join(os.path.dirname(__file__), "clientid.conf"), mode='r', encoding='utf-8-sig') as f:
-            global ClientID
-            ClientID = f.readline()
+            global rbClientID
+            rbClientID = f.readline()
     except Exception as err:
         Parent.Log(ScriptName, "{0}".format(err))
 
@@ -167,8 +174,8 @@ def ReloadSettings(jsonData):
 
     loadDatabase()
     
-    ScriptSettings.Reload(jsonData)
-    ScriptSettings.Save(SettingsFile)
+    rbScriptSettings.Reload(jsonData)
+    rbScriptSettings.Save(rbSettingsFile)
     return
 
 #---------------------------
@@ -184,10 +191,10 @@ def ScriptToggled(state):
     return
 
 def OpenWebsite():
-    os.startfile(HtmlPath)
+    os.startfile(rbHtmlPath)
     loadDatabase()
     data = RaidsData
-    data['client_id'] = ClientID 
+    data['client_id'] = rbClientID 
     dataString = json.dumps(data,indent=None)
     time.sleep(2) # wait till ui is loaded and connected
     Parent.BroadcastWsEvent("EVENT_RAID_DATA", dataString)
@@ -195,8 +202,8 @@ def OpenWebsite():
 
 def loadDatabase():
     # check if database exists
-    if not os.path.exists(Database):
-        conn = sqlite3.connect(Database)
+    if not os.path.exists(rbDatabase):
+        conn = sqlite3.connect(rbDatabase)
         # create database structure
         c = conn.cursor()
         c.execute('CREATE TABLE targets (userid INTEGER PRIMARY KEY, username INTEGER, lastraid INTEGER, lastraided INTEGER)')
@@ -207,7 +214,7 @@ def loadDatabase():
     
     data = {}
 
-    conn = sqlite3.connect(Database)
+    conn = sqlite3.connect(rbDatabase)
     c = conn.cursor()
     
     # get all targets
@@ -237,9 +244,8 @@ def loadDatabase():
     
     conn.close()
     
-    global RaidsData
-    RaidsData = data
-    return
+    global rbRaidsData
+    rbRaidsData = data
 
 def getDataAsString():
     dataString = ""
@@ -252,7 +258,7 @@ def addTargetByName(targetname):
     if not targetname:
         return
         
-    conn = sqlite3.connect(Database)
+    conn = sqlite3.connect(rbDatabase)
     c = conn.cursor()
     targetid = getUserId(targetname)
     
@@ -269,7 +275,7 @@ def addTargetByIdAndName(targetid, targetname):
     if not targetname or not targetid:
         return
     
-    conn = sqlite3.connect(Database)
+    conn = sqlite3.connect(rbDatabase)
     c = conn.cursor()
     
     try: 
@@ -285,7 +291,7 @@ def removeTargetByName(targetname):
     if (not targetname):
         return
     
-    conn = sqlite3.connect(Database)
+    conn = sqlite3.connect(rbDatabase)
     c = conn.cursor()
 
     try:
@@ -298,7 +304,7 @@ def removeTargetByName(targetname):
 
 # to add raids when we get raiaded / hosted
 def addRaid(targetname, raidtype, viewers, timestamp="now", targetid=None):
-    conn = sqlite3.connect(Database)
+    conn = sqlite3.connect(rbDatabase)
     c = conn.cursor()
     if timestamp == "now":
         timestamp = int((datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
@@ -318,7 +324,7 @@ def addRaid(targetname, raidtype, viewers, timestamp="now", targetid=None):
 
 # to add raids when we raided / hosted someone
 def addWeRaided(targetname, raidtype, viewers, timestamp="now", targetid=None):
-    conn = sqlite3.connect(Database)
+    conn = sqlite3.connect(rbDatabase)
     c = conn.cursor()
     if timestamp == "now":
         timestamp  = int((datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
@@ -337,7 +343,7 @@ def addWeRaided(targetname, raidtype, viewers, timestamp="now", targetid=None):
 
 # lookup the twitch userid for a given username
 def getUserId(username):
-    headers = {'Client-ID': ClientID, 'Accept': 'application/vnd.twitchtv.v5+json'}
+    headers = {'Client-ID': rbClientID, 'Accept': 'application/vnd.twitchtv.v5+json'}
     result = Parent.GetRequest("https://api.twitch.tv/kraken/users?login={0}".format(username.lower()), headers)
     jsonResult = json.loads(result)
 
@@ -353,4 +359,22 @@ def getUserId(username):
             return
     return int(jsonResult['_id'])
 
+def updateUi():
+    ui = {}
+    UiFilePath = os.path.join(os.path.dirname(__file__), "UI_Config.json")
+    try:
+        with codecs.open(UiFilePath, encoding="utf-8-sig", mode="r") as f:
+            ui = json.load(f, encoding="utf-8")
+    except Exception as err:
+        Parent.Log(ScriptName, "{0}".format(err))
 
+    # update ui with loaded settings
+    ui['MinViewers']['value'] = rbScriptSettings.MinViewers
+    ui['NewTarget']['value'] = rbScriptSettings.NewTarget
+    ui['RemoveTarget']['value'] = rbScriptSettings.RemoveTarget
+
+    try:
+        with codecs.open(UiFilePath, encoding="utf-8-sig", mode="w+") as f:
+            json.dump(ui, f, encoding="utf-8", indent=4, sort_keys=True)
+    except Exception as err:
+        Parent.Log(ScriptName, "{0}".format(err))
