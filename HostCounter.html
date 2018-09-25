@@ -85,7 +85,12 @@
           
           var jsonData = JSON.parse(jsonString);
           
-          vm.hostCount = jsonData.current_hosts;
+          if (jsonData.current_hosts != undefined){
+            vm.hostCount = jsonData.current_hosts;
+          } else {
+            vm.hostGoal = jsonData.goal_iteration;
+          }
+          
           vm.hostIteration = jsonData.goal_iteration;
         }
       };

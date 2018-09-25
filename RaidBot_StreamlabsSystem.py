@@ -23,7 +23,7 @@ ScriptName = "RaidBot"
 Website = "reecon820@gmail.com"
 Description = "Logs raids and hosts so you can keep track of"
 Creator = "Reecon820"
-Version = "0.0.3.0"
+Version = "0.0.3.1"
 
 #---------------------------
 #   Settings Handling
@@ -71,7 +71,7 @@ class RbApiTimer(threading.Thread):
             
             hosts = jsonResult['hosts']
             rbHostCount = len(hosts)
-            
+
             jsonData = '{{"current_hosts": {0}, "goal_iteration": {1} }}'.format(rbHostCount, rbScriptSettings.hostGoal)
             Parent.BroadcastWsEvent("EVENT_HOST_COUNT", jsonData)
 
@@ -232,6 +232,9 @@ def ReloadSettings(jsonData):
     
     rbScriptSettings.Reload(jsonData)
     rbScriptSettings.Save(rbSettingsFile)
+
+    jsonData = '{{ "goal_iteration": {0} }}'.format(rbScriptSettings.hostGoal)
+    Parent.BroadcastWsEvent("EVENT_HOST_COUNT", jsonData)
     return
 
 #---------------------------
@@ -239,9 +242,8 @@ def ReloadSettings(jsonData):
 #---------------------------
 def Unload():
     # clean up timer
-    if rbApiTimer and rbStopTimerEvent:
+    if rbApiTimer != None and rbStopTimerEvent != None:
         rbStopTimerEvent.set()
-        
     return
 
 #---------------------------
