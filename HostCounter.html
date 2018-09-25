@@ -1,0 +1,104 @@
+<html>
+<head>
+  <meta charset="UTF-8"> 
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.5.16/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue-resource@1.5.1"></script>
+  <script src="API_Key.js"></script>
+  <title>Host Count</title>
+</head>
+<body>
+    <div id="app">
+        <div class="hostCount" v-bind:is-complete="isCompleted">{{hostCount}} / {{hostGoal}}</div>
+    </div>
+</body>
+
+
+<script>
+  var vm = new Vue({
+    el: '#app',
+    data: {
+      hostCount: 0,
+      hostIteration: 10,
+      hostGoal: 10,
+      isCompleted: false,
+      serviceUrl: "",
+      socket: Object
+    }, watch: {
+        hostCount: (newCount, oldCount) => {
+            vm.isCompleted = newCount / vm.hostGoal >= 1.0
+        },
+        isCompleted: (newCompleted, oldCompleted) => {
+            // if current coal is completed set new goal after timeout
+            if (newCompleted) {
+                var timer = window.setTimeout(vm.iterateGoal, 30 * 1000);
+            }
+        }
+    },
+    methods: {
+        iterateGoal: () => {
+            // set new goal
+            vm.hostGoal = Math.ceil((vm.hostCount + 1) / vm.hostIteration) * vm.hostIteration;
+            vm.isCompleted = false;
+        }
+    },
+    mounted: function() {
+      //---------------------------------
+      //  Variables
+      //---------------------------------
+      this.serviceUrl = API_Socket;
+      this.socket = new WebSocket(this.serviceUrl);
+
+      //---------------------------------
+      //  Open Event
+      //---------------------------------
+      this.socket.onopen = function () {
+        // Format your Authentication Information
+        var auth = {
+          author: 'Reecon820',
+          website: 'reecon820@gmail.com',
+          api_key: API_Key,
+          events: ['EVENT_HOST_COUNT']
+        };
+
+        //  Send your Data to the server
+        vm.socket.send(JSON.stringify(auth));
+      };
+
+      //---------------------------------
+      //  Error Event
+      //---------------------------------
+      this.socket.onerror = function (error) {
+        //  Something went terribly wrong... Respond?!
+        console.log('Error: ' + error);
+      };
+
+      //---------------------------------
+      //  Message Event
+      //---------------------------------
+      this.socket.onmessage = function (message) {
+        var json = JSON.parse(message.data);
+
+        if(json.event == 'EVENT_HOST_COUNT') {
+          
+          var jsonString = json.data;
+          
+          var jsonData = JSON.parse(jsonString);
+          
+          vm.hostCount = jsonData.current_hosts;
+          vm.hostIteration = jsonData.goal_iteration;
+        }
+      };
+      
+      //---------------------------------
+      //  Message Event
+      //---------------------------------
+      this.socket.onclose = function () {
+        //  Connection has been closed by you or the server
+        console.log("Connection Closed!");
+      };
+    }
+  });
+</script>
+
+</html>

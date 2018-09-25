@@ -8,6 +8,7 @@ import json
 import re
 import datetime
 import time
+import threading
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib")) #point at lib folder for classes / references
 
 import clr
@@ -22,32 +23,57 @@ ScriptName = "RaidBot"
 Website = "reecon820@gmail.com"
 Description = "Logs raids and hosts so you can keep track of"
 Creator = "Reecon820"
-Version = "0.0.2.0"
+Version = "0.0.3.0"
 
 #---------------------------
 #   Settings Handling
 #---------------------------
 class RbSettings:
-	def __init__(self, settingsfile=None):
-		try:
-			with codecs.open(settingsfile, encoding="utf-8-sig", mode="r") as f:
-				self.__dict__ = json.load(f, encoding="utf-8")
-		except:
-			self.MinViewers = 10
-			self.NewTarget = ""
-			self.RemoveTarget = ""
+    def __init__(self, settingsfile=None):
+        try:
+            with codecs.open(settingsfile, encoding="utf-8-sig", mode="r") as f:
+                self.__dict__ = json.load(f, encoding="utf-8")
+        except:
+            self.MinViewers = 10
+            self.NewTarget = ""
+            self.RemoveTarget = ""
+            self.hostGoal = 100
 
-	def Reload(self, jsondata):
-		self.__dict__ = json.loads(jsondata, encoding="utf-8")
+    def Reload(self, jsondata):
+        self.__dict__ = json.loads(jsondata, encoding="utf-8")
 
-	def Save(self, settingsfile):
-		try:
-			with codecs.open(settingsfile, encoding="utf-8-sig", mode="w+") as f:
-				json.dump(self.__dict__, f, encoding="utf-8")
-			with codecs.open(settingsfile.replace("json", "js"), encoding="utf-8-sig", mode="w+") as f:
-				f.write("var settings = {0};".format(json.dumps(self.__dict__, encoding='utf-8')))
-		except:
-			Parent.Log(ScriptName, "Failed to save settings to file.")
+    def Save(self, settingsfile):
+        try:
+            with codecs.open(settingsfile, encoding="utf-8-sig", mode="w+") as f:
+                json.dump(self.__dict__, f, encoding="utf-8")
+            with codecs.open(settingsfile.replace("json", "js"), encoding="utf-8-sig", mode="w+") as f:
+                f.write("var settings = {0};".format(json.dumps(self.__dict__, encoding='utf-8')))
+        except:
+            Parent.Log(ScriptName, "Failed to save settings to file.")
+
+#---------------------------
+#   Host API Polling
+#---------------------------
+class RbApiTimer(threading.Thread):
+    def __init__(self, event, id):
+        threading.Thread.__init__(self)
+        self.stopped = event
+        self.id = id
+
+    def run(self):
+        while not self.stopped.wait(15.0):
+            # make api call
+            headers = {'Accept': 'application/json'}
+            result = Parent.GetRequest("https://tmi.twitch.tv/hosts?&target={0}".format(self.id), headers)
+            jsonResult = json.loads(result)
+            
+            jsonResult = json.loads(jsonResult['response'])
+            
+            hosts = jsonResult['hosts']
+            rbHostCount = len(hosts)
+            
+            jsonData = '{{"current_hosts": {0}, "goal_iteration": {1} }}'.format(rbHostCount, rbScriptSettings.hostGoal)
+            Parent.BroadcastWsEvent("EVENT_HOST_COUNT", jsonData)
 
 #---------------------------
 #   Define Global Variables
@@ -65,6 +91,15 @@ rbDatabase = os.path.join(os.path.dirname(__file__), "raids.db")
 
 global rbClientID
 rbClientID = None
+
+global rbApiTimer
+rbApiTimer = None
+
+global rbStopTimerEvent
+rbStopTimerEvent = None
+
+global rbHostOverlayPath
+rbHostOverlayPath = os.path.abspath(os.path.join(os.path.dirname(__file__), "HostCounter.html"))
 
 #---------------------------
 #   [Required] Initialize Data (Only called on load)
@@ -93,6 +128,27 @@ def Init():
             rbClientID = f.readline()
     except Exception as err:
         Parent.Log(ScriptName, "{0}".format(err))
+
+    # get channel user id
+    userid = '0'
+    headers = {'Client-ID': rbClientID, 'Accept': 'application/vnd.twitchtv.v5+json'}
+    result = Parent.GetRequest("https://api.twitch.tv/kraken/users?login={0}".format(Parent.GetChannelName().lower()), headers)
+    jsonResult = json.loads(result)
+    if jsonResult['status'] != 200:
+        Parent.Log(ScriptName, "lookup user: {0}".format(jsonResult))
+        return
+    else:
+        jsonResult = json.loads(jsonResult['response'])
+        if jsonResult['users']:
+            jsonResult = jsonResult['users'][0]
+            userid = jsonResult['_id']
+
+    # set up and start timer
+    global rbStopTimerEvent
+    rbStopTimerEvent = threading.Event()
+    global rbApiTimer
+    rbApiTimer = RbApiTimer(rbStopTimerEvent, userid)
+    rbApiTimer.start()
 
     return
 
@@ -182,6 +238,10 @@ def ReloadSettings(jsonData):
 #   [Optional] Unload (Called when a user reloads their scripts or closes the bot / cleanup stuff)
 #---------------------------
 def Unload():
+    # clean up timer
+    if rbApiTimer and rbStopTimerEvent:
+        rbStopTimerEvent.set()
+        
     return
 
 #---------------------------
@@ -193,7 +253,7 @@ def ScriptToggled(state):
 def OpenWebsite():
     os.startfile(rbHtmlPath)
     loadDatabase()
-    data = RaidsData
+    data = rbRaidsData
     data['client_id'] = rbClientID 
     dataString = json.dumps(data,indent=None)
     time.sleep(2) # wait till ui is loaded and connected
@@ -250,7 +310,7 @@ def loadDatabase():
 def getDataAsString():
     dataString = ""
 
-    dataString = json.dumps(RaidsData)
+    dataString = json.dumps(rbRaidsData)
 
     return dataString
 
@@ -359,6 +419,12 @@ def getUserId(username):
             return
     return int(jsonResult['_id'])
 
+def copyOverlayPath():
+    command = "echo " + rbHostOverlayPath + " | clip"
+    os.system(command)
+    return
+
+
 def updateUi():
     ui = {}
     UiFilePath = os.path.join(os.path.dirname(__file__), "UI_Config.json")
@@ -372,6 +438,7 @@ def updateUi():
     ui['MinViewers']['value'] = rbScriptSettings.MinViewers
     ui['NewTarget']['value'] = rbScriptSettings.NewTarget
     ui['RemoveTarget']['value'] = rbScriptSettings.RemoveTarget
+    ui['hostGoal']['value'] = rbScriptSettings.hostGoal
 
     try:
         with codecs.open(UiFilePath, encoding="utf-8-sig", mode="w+") as f:
