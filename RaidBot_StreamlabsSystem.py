@@ -23,7 +23,7 @@ ScriptName = "RaidBot"
 Website = "reecon820@gmail.com"
 Description = "Logs raids and hosts so you can keep track of"
 Creator = "Reecon820"
-Version = "0.0.3.1"
+Version = "0.0.3.2"
 
 #---------------------------
 #   Settings Handling
@@ -51,29 +51,6 @@ class RbSettings:
         except:
             Parent.Log(ScriptName, "Failed to save settings to file.")
 
-#---------------------------
-#   Host API Polling
-#---------------------------
-class RbApiTimer(threading.Thread):
-    def __init__(self, event, id):
-        threading.Thread.__init__(self)
-        self.stopped = event
-        self.id = id
-
-    def run(self):
-        while not self.stopped.wait(15.0):
-            # make api call
-            headers = {'Accept': 'application/json'}
-            result = Parent.GetRequest("https://tmi.twitch.tv/hosts?&target={0}".format(self.id), headers)
-            jsonResult = json.loads(result)
-            
-            jsonResult = json.loads(jsonResult['response'])
-            
-            hosts = jsonResult['hosts']
-            rbHostCount = len(hosts)
-
-            jsonData = '{{"current_hosts": {0}, "goal_iteration": {1} }}'.format(rbHostCount, rbScriptSettings.hostGoal)
-            Parent.BroadcastWsEvent("EVENT_HOST_COUNT", jsonData)
 
 #---------------------------
 #   Define Global Variables
@@ -100,6 +77,9 @@ rbStopTimerEvent = None
 
 global rbHostOverlayPath
 rbHostOverlayPath = os.path.abspath(os.path.join(os.path.dirname(__file__), "HostCounter.html"))
+
+global rbActiveHostsFile
+rbActiveHostsFile = os.path.abspath(os.path.join(os.path.dirname(__file__), "ActiveHosts.txt"))
 
 #---------------------------
 #   [Required] Initialize Data (Only called on load)
@@ -172,7 +152,7 @@ def Execute(data):
             tokens = data.RawData.split(" ")
             targetname = tokens[3][1:]
             viewercount = int(tokens[4])
-            Parent.Log(ScriptName, "target: {0} - viewers: {1}".format(targetname, viewercount))
+            #Parent.Log(ScriptName, "target: {0} - viewers: {1}".format(targetname, viewercount))
 
             if targetname != '-':
                 addTargetByName(targetname)
@@ -185,7 +165,7 @@ def Execute(data):
 
             if re.search(":jtv.*:.*is\snow\shosting\syou", message): # or (ScriptSettings.autohosts and re.search(":jtv.*:.*is\snow\sauto\shosting\syou", message)):
                 
-                Parent.Log(ScriptName, "got hosted: {}".format(message))
+                #Parent.Log(ScriptName, "got hosted: {}".format(message))
 
                 hostType = "host" if re.search(":jtv.*:.*is\snow\shosting\syou", message) else "autohost"
                 hostStringTokens = message.split(":")[2].split(" ")
@@ -196,7 +176,7 @@ def Execute(data):
                 else:
                     viewers = int(hostStringTokens[10]) if len(hostStringTokens) > 5 else 0
 
-                Parent.Log(ScriptName, "{0} {2} for {1} viewers".format(hostername, viewers, hostType))
+                #Parent.Log(ScriptName, "{0} {2} for {1} viewers".format(hostername, viewers, hostType))
 
                 addTargetByName(hostername)
                 addRaid(hostername, hostType, viewers)
@@ -233,7 +213,7 @@ def ReloadSettings(jsonData):
     rbScriptSettings.Reload(jsonData)
     rbScriptSettings.Save(rbSettingsFile)
 
-    jsonData = '{{ "goal_iteration": {0} }}'.format(rbScriptSettings.hostGoal)
+    jsonData = '{{ "goal_iteration": {} }}'.format(rbScriptSettings.hostGoal)
     Parent.BroadcastWsEvent("EVENT_HOST_COUNT", jsonData)
     return
 
@@ -426,6 +406,10 @@ def copyOverlayPath():
     os.system(command)
     return
 
+def copyHostsFilePath():
+    command = "echo " + rbActiveHostsFile + " | clip"
+    os.system(command)
+    return
 
 def updateUi():
     ui = {}
@@ -447,3 +431,35 @@ def updateUi():
             json.dump(ui, f, encoding="utf-8", indent=4, sort_keys=True)
     except Exception as err:
         Parent.Log(ScriptName, "{0}".format(err))
+
+#---------------------------
+#   Host API Polling
+#---------------------------
+class RbApiTimer(threading.Thread):
+    def __init__(self, event, id):
+        threading.Thread.__init__(self)
+        self.stopped = event
+        self.id = id
+
+    def run(self):
+        while not self.stopped.wait(15.0):
+            # make api call
+            headers = {'Accept': 'application/json'}
+            result = Parent.GetRequest("https://tmi.twitch.tv/hosts?&target={0}".format(self.id), headers)
+            jsonResult = json.loads(result)
+            
+            jsonResult = json.loads(jsonResult['response'])
+            
+            hosts = jsonResult['hosts']
+            rbHostCount = len(hosts)
+
+            # send data to overlay
+            jsonData = '{{ "current_hosts": {} }}'.format(rbHostCount)
+            Parent.BroadcastWsEvent("EVENT_HOST_COUNT", jsonData)
+
+            # save data to file
+            try:
+                with codecs.open(rbActiveHostsFile, encoding="utf-8-sig", mode="w+") as f:
+                    f.write("{}".format(rbHostCount))
+            except Exception as err:
+                Parent.Log(ScriptName, "{0}".format(err))

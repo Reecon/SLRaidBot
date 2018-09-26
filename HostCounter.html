@@ -40,6 +40,12 @@
             // set new goal
             vm.hostGoal = Math.ceil((vm.hostCount + 1) / vm.hostIteration) * vm.hostIteration;
             vm.isCompleted = false;
+        },
+        updateIteration: (newIteration) => {
+          vm.hostIteration = newIteration;
+          vm.hostGoal = Math.ceil((vm.hostCount + 1) / vm.hostIteration) * vm.hostIteration;
+          vm.isCompleted = vm.hostCount / vm.hostGoal >= 1.0;
+          localStorage.setItem('hostIteration', vm.hostIteration);
         }
     },
     mounted: function() {
@@ -48,6 +54,11 @@
       //---------------------------------
       this.serviceUrl = API_Socket;
       this.socket = new WebSocket(this.serviceUrl);
+
+      if (localStorage.getItem('hostIteration')) {
+        this.hostIteration = parseInt(localStorage.getItem('hostIteration'));
+        this.hostGoal = this.hostIteration;
+      }
 
       //---------------------------------
       //  Open Event
@@ -84,14 +95,15 @@
           var jsonString = json.data;
           
           var jsonData = JSON.parse(jsonString);
+          console.log("data",jsonData);
           
-          if (jsonData.current_hosts != undefined){
+          if (jsonData.current_hosts != undefined) {
             vm.hostCount = jsonData.current_hosts;
-          } else {
-            vm.hostGoal = jsonData.goal_iteration;
+          } 
+          if (jsonData.goal_iteration != undefined) {
+            vm.updateIteration(jsonData.goal_iteration);
           }
           
-          vm.hostIteration = jsonData.goal_iteration;
         }
       };
       
