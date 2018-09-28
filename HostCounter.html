@@ -27,6 +27,7 @@
     }, watch: {
         hostCount: (newCount, oldCount) => {
             vm.isCompleted = newCount / vm.hostGoal >= 1.0
+            localStorage.setItem('hostCount', vm.hostCount);
         },
         isCompleted: (newCompleted, oldCompleted) => {
             // if current coal is completed set new goal after timeout
@@ -39,11 +40,12 @@
         iterateGoal: () => {
             // set new goal
             vm.hostGoal = Math.ceil((vm.hostCount + 1) / vm.hostIteration) * vm.hostIteration;
+            localStorage.setItem('hostGoal', vm.hostGoal);
             vm.isCompleted = false;
         },
         updateIteration: (newIteration) => {
           vm.hostIteration = newIteration;
-          vm.hostGoal = Math.ceil((vm.hostCount + 1) / vm.hostIteration) * vm.hostIteration;
+          vm.iterateGoal();
           vm.isCompleted = vm.hostCount / vm.hostGoal >= 1.0;
           localStorage.setItem('hostIteration', vm.hostIteration);
         }
@@ -57,8 +59,17 @@
 
       if (localStorage.getItem('hostIteration')) {
         this.hostIteration = parseInt(localStorage.getItem('hostIteration'));
-        this.hostGoal = this.hostIteration;
       }
+
+      if (localStorage.getItem('hostGoal')) {
+        this.hostGoal = parseInt(localStorage.getItem('hostGoal'));
+      }
+
+      if (localStorage.getItem('hostCount')) {
+        this.hostCount = parseInt(localStorage.getItem('hostCount'));
+      }
+
+
 
       //---------------------------------
       //  Open Event
@@ -95,7 +106,7 @@
           var jsonString = json.data;
           
           var jsonData = JSON.parse(jsonString);
-          //console.log("data",jsonData);
+          console.log("data",jsonData);
           
           if (jsonData.current_hosts != undefined) {
             vm.hostCount = jsonData.current_hosts;

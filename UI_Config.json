@@ -33,14 +33,22 @@
         "label": "Host Goal", 
         "tooltip": "Goal for people hosting the channel.", 
         "type": "numberbox", 
-        "value": 100
+        "value": 1000
     }, 
     "output_file": "Settings/settings.json", 
     "zbtnCopy": {
         "function": "copyOverlayPath", 
         "group": "HostCounter", 
-        "label": "Copy Overlay PAth", 
+        "label": "Copy Overlay Path", 
         "tooltip": "Copies the path to the hosts overlay to the clipboard.", 
+        "type": "button", 
+        "wsevent": "EVENT_NONE"
+    }, 
+    "zbtnCopy2": {
+        "function": "copyHostsFilePath", 
+        "group": "HostCounter", 
+        "label": "Copy Hosts File Path", 
+        "tooltip": "Copies the path to the active hosts file to the clipboard.", 
         "type": "button", 
         "wsevent": "EVENT_NONE"
     }
