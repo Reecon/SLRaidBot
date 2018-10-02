@@ -146,7 +146,7 @@ def Execute(data):
                 viewercount = re.search("msg-param-viewerCount=\d", data.RawData).split("=")[1]
                 
                 addTargetByIdAndName(raiderid, raidername)
-                addRaid(raidername, "raid", viewercount)
+                addRaid(raidername, "raid", viewercount, targetid=raiderid)
                 
         elif "HOSTTARGET" in data.RawData: # we host someone
             tokens = data.RawData.split(" ")
@@ -177,9 +177,9 @@ def Execute(data):
                     viewers = int(hostStringTokens[10]) if len(hostStringTokens) > 5 else 0
 
                 #Parent.Log(ScriptName, "{0} {2} for {1} viewers".format(hostername, viewers, hostType))
-
-                addTargetByName(hostername)
-                addRaid(hostername, hostType, viewers)
+                hosterId = getUserId(hostername)    # only poll api once per host, this is bad enough
+                addTargetByIdAndName(hosterId, hostername)
+                addRaid(hostername, hostType, viewers, targetid=hosterId)
 
         # we raid someone
 
@@ -442,7 +442,7 @@ class RbApiTimer(threading.Thread):
         self.id = id
 
     def run(self):
-        while not self.stopped.wait(15.0):
+        while not self.stopped.wait(30.0):
             # make api call
             headers = {'Accept': 'application/json'}
             result = Parent.GetRequest("https://tmi.twitch.tv/hosts?&target={0}".format(self.id), headers)
