@@ -180,7 +180,7 @@ def Execute(data):
                     viewers = int(hostStringTokens[10]) if len(hostStringTokens) > 5 else 0
 
                 log2file("host by {0} for {1} viewers".format(hostername, viewers))
-                
+
                 if viewers >= rbScriptSettings.MinViewers:
                     #Parent.Log(ScriptName, "{0} {2} for {1} viewers".format(hostername, viewers, hostType))
                     hosterId = getUserId(hostername)    # only poll api once per host, this is bad enough
@@ -441,7 +441,7 @@ def updateUi():
 def log2file(message):
     logFilePath = os.path.join(os.path.dirname(__file__), "log.txt")
     try:
-        with codecs.open(logFilePath, encoding="utf-8-sig", mode="a+") as f:
+        with codecs.open(logFilePath, encoding="utf-8", mode="a+") as f:
             line = "{0} -- {1}".format(datetime.datetime.now(), message)
             f.write(line + "\n")
     except Exception as err:
