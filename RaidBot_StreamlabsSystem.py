@@ -23,7 +23,7 @@ ScriptName = "RaidBot"
 Website = "reecon820@gmail.com"
 Description = "Logs raids and hosts so you can keep track of"
 Creator = "Reecon820"
-Version = "0.0.3.3"
+Version = "0.0.3.4"
 
 #---------------------------
 #   Settings Handling
@@ -144,9 +144,12 @@ def Execute(data):
                 raiderid = re.search("user-id=\d", data.RawData).group(0).split("=")[1]
                 raidername = re.search("msg-param-login=.*;", data.RawData).group(0).strip(";").split("=")[1]
                 viewercount = re.search("msg-param-viewerCount=\d", data.RawData).split("=")[1]
+
+                log2file("raid by {0} for {1} viewers".format(raidername, viewercount))
                 
-                addTargetByIdAndName(raiderid, raidername)
-                addRaid(raidername, "raid", viewercount, targetid=raiderid)
+                if viewercount >= rbScriptSettings.MinViewers:
+                    addTargetByIdAndName(raiderid, raidername)
+                    addRaid(raidername, "raid", viewercount, targetid=raiderid)
                 
         elif "HOSTTARGET" in data.RawData: # we host someone
             tokens = data.RawData.split(" ")
@@ -176,10 +179,13 @@ def Execute(data):
                 else:
                     viewers = int(hostStringTokens[10]) if len(hostStringTokens) > 5 else 0
 
-                #Parent.Log(ScriptName, "{0} {2} for {1} viewers".format(hostername, viewers, hostType))
-                hosterId = getUserId(hostername)    # only poll api once per host, this is bad enough
-                addTargetByIdAndName(hosterId, hostername)
-                addRaid(hostername, hostType, viewers, targetid=hosterId)
+                log2file("host by {0} for {1} viewers".format(hostername, viewers))
+                
+                if viewers >= rbScriptSettings.MinViewers:
+                    #Parent.Log(ScriptName, "{0} {2} for {1} viewers".format(hostername, viewers, hostType))
+                    hosterId = getUserId(hostername)    # only poll api once per host, this is bad enough
+                    addTargetByIdAndName(hosterId, hostername)
+                    addRaid(hostername, hostType, viewers, targetid=hosterId)
 
         # we raid someone
 
@@ -418,7 +424,7 @@ def updateUi():
         with codecs.open(UiFilePath, encoding="utf-8-sig", mode="r") as f:
             ui = json.load(f, encoding="utf-8")
     except Exception as err:
-        Parent.Log(ScriptName, "{0}".format(err))
+        Parent.Log(ScriptName, "Error readin UI file: {0}".format(err))
 
     # update ui with loaded settings
     ui['MinViewers']['value'] = rbScriptSettings.MinViewers
@@ -430,20 +436,32 @@ def updateUi():
         with codecs.open(UiFilePath, encoding="utf-8-sig", mode="w+") as f:
             json.dump(ui, f, encoding="utf-8", indent=4, sort_keys=True)
     except Exception as err:
-        Parent.Log(ScriptName, "{0}".format(err))
+        Parent.Log(ScriptName, "Error writing UI file: {0}".format(err))
+
+def log2file(message):
+    logFilePath = os.path.join(os.path.dirname(__file__), "log.txt")
+    try:
+        with codecs.open(logFilePath, encoding="utf-8-sig", mode="a+") as f:
+            line = "{0} -- {1}".format(datetime.datetime.now(), message)
+            f.write(line + "\n")
+    except Exception as err:
+        Parent.Log(ScriptName, "Error writing log file: {0}".format(err))
 
 #---------------------------
 #   Host API Polling
 #---------------------------
 class RbApiTimer(threading.Thread):
     def __init__(self, event, id):
+        log2file("init thread")
         threading.Thread.__init__(self)
         self.stopped = event
         self.id = id
 
     def run(self):
-        while not self.stopped.wait(30.0):
+        log2file("run thread")
+        while not self.stopped.wait(60.0):
             # make api call
+            log2file("make api call")
             headers = {'Accept': 'application/json'}
             result = Parent.GetRequest("https://tmi.twitch.tv/hosts?&target={0}".format(self.id), headers)
             jsonResult = json.loads(result)
@@ -456,10 +474,12 @@ class RbApiTimer(threading.Thread):
             # send data to overlay
             jsonData = '{{ "current_hosts": {} }}'.format(rbHostCount)
             Parent.BroadcastWsEvent("EVENT_HOST_COUNT", jsonData)
-
+            log2file("hosts: {}".format(rbHostCount))
             # save data to file
             try:
                 with codecs.open(rbActiveHostsFile, encoding="utf-8-sig", mode="w+") as f:
                     f.write("{}".format(rbHostCount))
             except Exception as err:
                 Parent.Log(ScriptName, "{0}".format(err))
+            
+            log2file("wait")
