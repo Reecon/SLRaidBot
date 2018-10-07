@@ -23,7 +23,7 @@ ScriptName = "RaidBot"
 Website = "reecon820@gmail.com"
 Description = "Logs raids and hosts so you can keep track of"
 Creator = "Reecon820"
-Version = "0.0.3.4"
+Version = "0.0.3.5"
 
 #---------------------------
 #   Settings Handling
@@ -113,6 +113,7 @@ def Init():
     userid = '0'
     headers = {'Client-ID': rbClientID, 'Accept': 'application/vnd.twitchtv.v5+json'}
     result = Parent.GetRequest("https://api.twitch.tv/kraken/users?login={0}".format(Parent.GetChannelName().lower()), headers)
+    
     jsonResult = json.loads(result)
     if jsonResult['status'] != 200:
         Parent.Log(ScriptName, "lookup user: {0}".format(jsonResult))
@@ -452,34 +453,33 @@ def log2file(message):
 #---------------------------
 class RbApiTimer(threading.Thread):
     def __init__(self, event, id):
-        log2file("init thread")
         threading.Thread.__init__(self)
         self.stopped = event
         self.id = id
 
     def run(self):
-        log2file("run thread")
         while not self.stopped.wait(60.0):
             # make api call
-            log2file("make api call")
-            headers = {'Accept': 'application/json'}
-            result = Parent.GetRequest("https://tmi.twitch.tv/hosts?&target={0}".format(self.id), headers)
-            jsonResult = json.loads(result)
+            timerHeaders = {'Accept': 'application/json'}
+            timerResult = Parent.GetRequest("https://tmi.twitch.tv/hosts?&target={0}".format(self.id), timerHeaders)
+            timerJsonResult = json.loads(timerResult)
             
-            jsonResult = json.loads(jsonResult['response'])
-            
-            hosts = jsonResult['hosts']
-            rbHostCount = len(hosts)
+            if timerJsonResult['status'] == 200:
+                timerJsonResult = json.loads(timerJsonResult['response'])
+                
+                hosts = timerJsonResult['hosts']
+                rbHostCount = len(hosts)
 
-            # send data to overlay
-            jsonData = '{{ "current_hosts": {} }}'.format(rbHostCount)
-            Parent.BroadcastWsEvent("EVENT_HOST_COUNT", jsonData)
-            log2file("hosts: {}".format(rbHostCount))
-            # save data to file
-            try:
-                with codecs.open(rbActiveHostsFile, encoding="utf-8-sig", mode="w+") as f:
-                    f.write("{}".format(rbHostCount))
-            except Exception as err:
-                Parent.Log(ScriptName, "{0}".format(err))
+                # send data to overlay
+                timerJsonData = '{{ "current_hosts": {} }}'.format(rbHostCount)
+                Parent.BroadcastWsEvent("EVENT_HOST_COUNT", timerJsonData)
+                
+                # save data to file
+                try:
+                    with codecs.open(rbActiveHostsFile, encoding="utf-8-sig", mode="w+") as f:
+                        f.write("{}".format(rbHostCount))
+                except Exception as err:
+                    Parent.Log(ScriptName, "{0}".format(err))
+            else:
+                Parent.Log(ScriptName, "Error polling hosts: {}".format(timerJsonResult['status']))
             
-            log2file("wait")
