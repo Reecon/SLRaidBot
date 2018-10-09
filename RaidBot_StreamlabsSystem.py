@@ -23,7 +23,7 @@ ScriptName = "RaidBot"
 Website = "reecon820@gmail.com"
 Description = "Logs raids and hosts so you can keep track of"
 Creator = "Reecon820"
-Version = "0.0.3.5"
+Version = "0.0.3.6"
 
 #---------------------------
 #   Settings Handling
@@ -139,6 +139,7 @@ def Init():
 def Execute(data):
     
     if data.IsRawData():
+        log2file("{}".format(data.RawData))
         if "USERNOTICE" in data.RawData: # we get raided
             if "msg-id=raid" in data.RawData:
                 # get raiding channel and viewers
