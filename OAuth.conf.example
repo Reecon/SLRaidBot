@@ -1,0 +1,7 @@
+# place your streamer oauth token here
+# you can generate a token here https://twitchapps.com/tmi/
+# make sure you log in with your streamer account
+# 
+# replace the example below with the generated token (including oauth:)
+# and rename this file to OAuth.conf
+oauth:12345abcdefg67890

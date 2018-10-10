@@ -9,6 +9,8 @@ import re
 import datetime
 import time
 import threading
+import socket
+import errno
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib")) #point at lib folder for classes / references
 
 import clr
@@ -23,7 +25,7 @@ ScriptName = "RaidBot"
 Website = "reecon820@gmail.com"
 Description = "Logs raids and hosts so you can keep track of"
 Creator = "Reecon820"
-Version = "0.0.3.6"
+Version = "0.0.4.0"
 
 #---------------------------
 #   Settings Handling
@@ -75,11 +77,20 @@ rbApiTimer = None
 global rbStopTimerEvent
 rbStopTimerEvent = None
 
+global rbIRCBot
+rbIRCBot = None
+
+global rbStopIRCBotEvent
+rbStopIRCBotEvent = None
+
 global rbHostOverlayPath
 rbHostOverlayPath = os.path.abspath(os.path.join(os.path.dirname(__file__), "HostCounter.html"))
 
 global rbActiveHostsFile
 rbActiveHostsFile = os.path.abspath(os.path.join(os.path.dirname(__file__), "ActiveHosts.txt"))
+
+global rbOAuthFile
+rbOAuthFile = os.path.abspath(os.path.join(os.path.dirname(__file__), "OAuth.conf"))
 
 #---------------------------
 #   [Required] Initialize Data (Only called on load)
@@ -131,15 +142,21 @@ def Init():
     rbApiTimer = RbApiTimer(rbStopTimerEvent, userid)
     rbApiTimer.start()
 
+    global rbStopIRCBotEvent
+    rbStopIRCBotEvent = threading.Event()
+    global rbIRCBot
+    rbIRCBot = IRCBot(rbStopIRCBotEvent)
+    rbIRCBot.start()
+
     return
 
 #---------------------------
 #   [Required] Execute Data / Process messages
 #---------------------------
 def Execute(data):
-    
+    #log2file("{0}: {1} - {2}".format(data.UserName, data.Message, data.RawData))
     if data.IsRawData():
-        log2file("{}".format(data.RawData))
+        #log2file("{}".format(data.RawData))
         if "USERNOTICE" in data.RawData: # we get raided
             if "msg-id=raid" in data.RawData:
                 # get raiding channel and viewers
@@ -162,33 +179,7 @@ def Execute(data):
             if targetname != '-':
                 addTargetByName(targetname)
                 addWeRaided(targetname, "host", viewercount)
-
-        elif "PRIVMSG" in data.RawData: # we get hosted
-            # :jtv!jtv@jtv.tmi.twitch.tv PRIVMSG care_o_bot :Reecon820 is now hosting you.
-            
-            message = data.RawData
-
-            if re.search(":jtv.*:.*is\snow\shosting\syou", message): # or (ScriptSettings.autohosts and re.search(":jtv.*:.*is\snow\sauto\shosting\syou", message)):
-                
-                #Parent.Log(ScriptName, "got hosted: {}".format(message))
-
-                hostType = "host" if re.search(":jtv.*:.*is\snow\shosting\syou", message) else "autohost"
-                hostStringTokens = message.split(":")[2].split(" ")
-                hostername = hostStringTokens[0]
-                viewers = 0
-                if hostType == "host":
-                    viewers = int(hostStringTokens[9]) if len(hostStringTokens) > 5 else 0
-                else:
-                    viewers = int(hostStringTokens[10]) if len(hostStringTokens) > 5 else 0
-
-                log2file("host by {0} for {1} viewers".format(hostername, viewers))
-
-                if viewers >= rbScriptSettings.MinViewers:
-                    #Parent.Log(ScriptName, "{0} {2} for {1} viewers".format(hostername, viewers, hostType))
-                    hosterId = getUserId(hostername)    # only poll api once per host, this is bad enough
-                    addTargetByIdAndName(hosterId, hostername)
-                    addRaid(hostername, hostType, viewers, targetid=hosterId)
-
+        
         # we raid someone
 
     return
@@ -232,6 +223,10 @@ def Unload():
     # clean up timer
     if rbApiTimer != None and rbStopTimerEvent != None:
         rbStopTimerEvent.set()
+    
+    # clean up irc bot
+    if rbIRCBot != None and rbStopIRCBotEvent != None:
+        rbStopIRCBotEvent.set()
     return
 
 #---------------------------
@@ -484,3 +479,112 @@ class RbApiTimer(threading.Thread):
             else:
                 Parent.Log(ScriptName, "Error polling hosts: {}".format(timerJsonResult['status']))
             
+
+#---------------------------
+#   Twitch Chat Connection
+#---------------------------
+class IRCBot(threading.Thread):
+
+    def __init__(self, event):
+        threading.Thread.__init__(self)
+        self.stopped = event
+        self.server = "irc.twitch.tv"
+        self.port = 6667
+        self.user = Parent.GetChannelName().lower()
+        self.hostchannel = '#' + Parent.GetChannelName().lower()
+
+        try:
+            with codecs.open(rbOAuthFile, encoding="utf-8-sig", mode="r") as f:
+                for line in f:
+                    line = line.strip()
+                    if len(line) > 0:
+                        if line[0] != '#':
+                            self.pw = line
+        except Exception as err:
+            Parent.Log(ScriptName, "Error reading OAuth file: {0}".format(err))
+        
+        
+        self.ircsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.ircsock.settimeout(0.5)
+        
+    def connect_to_server_(self):
+        log2file("IRCBot:: connect")
+        self.ircsock.connect((self.server, self.port))
+        log2file("IRCBot:: user")
+        print(self.ircsock.send(("USER " + self.user + " " + self.user + " " + self.user + " : " + self.user + "\n").encode("UTF-8")))
+        log2file("IRCBot:: pass")
+        print(self.ircsock.send(("PASS " + self.pw + "\n").encode("UTF-8")))
+        log2file("IRCBot:: nick")
+        print(self.ircsock.send(("NICK " + self.user + "\n").encode("UTF-8")))
+        self.join_channel_(self.hostchannel)
+        log2file("IRCBot:: connected to " + self.hostchannel)
+    
+    def join_channel_(self,chan):
+        log2file("IRCBot:: join")
+        print(self.ircsock.send(("JOIN "+ chan + "\n").encode("UTF-8")))
+    
+    def pong(self):
+        log2file("IRCBot:: pong")
+        print(self.ircsock.send(("PONG :Pong\n").encode("UTF-8")))
+        
+    def sendmsg(self, chan, msg):
+        log2file("IRCBot:: send")
+        print(self.ircsock.send(("PRIVMSG " + chan + " :" + msg + "\n").encode("UTF-8")))
+        
+    def shutdown(self):
+        log2file("IRCBot:: part")
+        print(self.ircsock.send(("PART "+ self.hostchannel + "\n").encode("UTF-8")))
+        log2file("IRCBot:: quit")
+        print(self.ircsock.send(("QUIT off for now").encode("UTF-8")))
+        log2file("IRCBot:: close socket")
+        self.ircsock.close()
+    
+    def run(self):
+        # connect to irc
+        self.connect_to_server_()
+
+        # wait for a new message to process
+        while not self.stopped.wait(0.1):
+            try: 
+                ircmsg = self.ircsock.recv(4096)
+            except socket.timeout, e:
+                err = e.args[0]
+                if err == 'timed out':
+                    continue
+            except socket.error, e:
+                # a "real" error occurred
+                log2file("IRCBot:: Error reading irc socket: {}".format(e.message))
+                Parent.Log(ScriptName, "Error reading irc socket: {}".format(e.message))
+            else:
+                ircmsg = ircmsg.decode("UTF-8")
+                ircmsg = ircmsg.strip('\r\n')
+                #log2file("IRCBot:: " + ircmsg)
+                
+                if ircmsg.find("PING :") != -1:
+                    self.pong()
+
+                #only consume host notifications
+                if re.search(":jtv.*:.*is\snow\shosting\syou", ircmsg):
+                    # :jtv!jtv@jtv.tmi.twitch.tv PRIVMSG reecon820 :care_o_bot is now hosting you.
+                    log2file("IRCBot:: {}".format(ircmsg))
+                    message = ircmsg
+
+                    if re.search(":jtv!.*:.*is\snow\shosting\syou", message):# or (rbScriptSettings.autoHosts and re.search("is\snow\sauto\shosting\syou", message)):
+                        hostType = "host" if re.search(":jtv.*:.*is\snow\shosting\syou", message) else "autohost"
+                        hostStringTokens = message.split(":")[2].split(" ")
+                        hostername = hostStringTokens[0]
+                        viewers = 0
+                        if hostType == "host":
+                            viewers = int(hostStringTokens[9]) if len(hostStringTokens) > 5 else 0
+                        else:
+                            viewers = int(hostStringTokens[10]) if len(hostStringTokens) > 5 else 0
+
+                        log2file("IRCBot:: host by {0} for {1} viewers".format(hostername, viewers))
+
+                        if viewers >= rbScriptSettings.MinViewers:
+                            #Parent.Log(ScriptName, "{0} {2} for {1} viewers".format(hostername, viewers, hostType))
+                            hosterId = getUserId(hostername)    # only poll api once per host, this is bad enough
+                            addTargetByIdAndName(hosterId, hostername)
+                            addRaid(hostername, hostType, viewers, targetid=hosterId)
+        self.shutdown()
+                    
