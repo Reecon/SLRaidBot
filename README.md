@@ -12,6 +12,9 @@ The UI sorts your potential raid targets in reverse order of when you raided/hos
 ## Setup
 
 * For the initial setup rename `clientid.conf.example` to `clientid.conf` and replace the line with your client id.
+  * See the [Twitch Developers Documentation](https://dev.twitch.tv/docs/authentication/#registration) on how to get a client id.
+* Also rename `OAuth.conf.example` to `OAuth.conf` and replace the example with an OAuth token that will allow the script to login to chat with the streamer-account.
+  * You can get such a token from [Twitch Chat OAuth Password Generator](https://twitchapps.com/tmi)
 * Insert the API Key file in the bot's script menu
 
 ### Overlay Styling Example
