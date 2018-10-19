@@ -28,7 +28,6 @@
               </button>
             </h5>
           </div>
-      
           <div :id="item.name" class="collapse" :aria-labelledby="'heading'+item.name" data-parent="#accordionExample">
             <div class="card-body">
               <p v-if="item.status != 'offline'"><a :href="'https://www.twitch.tv/'+item.name" target="_blank">Go To Channel</a></p>
@@ -47,7 +46,6 @@
     </div>
   </div>
 </body>
-
 
 <script>
   var vm = new Vue({
@@ -144,7 +142,7 @@
           // this is soooo stupid, please halp
           var raidsArray = [];
           for (i in jsonData) {
-            if (i != 'client_id') {
+            if (i != 'client_id' && i != 'hide_offline') {
               var obj = {};
               obj['name'] = i;
               obj['userid'] = jsonData[i].userid;
