@@ -25,7 +25,7 @@ ScriptName = "RaidBot"
 Website = "reecon820@gmail.com"
 Description = "Logs raids and hosts so you can keep track of"
 Creator = "Reecon820"
-Version = "0.0.4.0"
+Version = "0.0.4.1"
 
 #---------------------------
 #   Settings Handling
@@ -156,13 +156,13 @@ def Init():
 def Execute(data):
     #log2file("{0}: {1} - {2}".format(data.UserName, data.Message, data.RawData))
     if data.IsRawData():
-        #log2file("{}".format(data.RawData))
         if "USERNOTICE" in data.RawData: # we get raided
+            log2file("{}".format(data.RawData))
             if "msg-id=raid" in data.RawData:
                 # get raiding channel and viewers
-                raiderid = re.search("user-id=\d", data.RawData).group(0).split("=")[1]
+                raiderid = re.search("user-id=\d+;", data.RawData).group(0).strip(";").split("=")[1]
                 raidername = re.search("msg-param-login=.*;", data.RawData).group(0).strip(";").split("=")[1]
-                viewercount = re.search("msg-param-viewerCount=\d", data.RawData).split("=")[1]
+                viewercount = re.search("msg-param-viewerCount=\d+;", data.RawData).strip(";").split("=")[1]
 
                 log2file("raid by {0} for {1} viewers".format(raidername, viewercount))
                 
@@ -575,9 +575,20 @@ class IRCBot(threading.Thread):
                         hostername = hostStringTokens[0]
                         viewers = 0
                         if hostType == "host":
-                            viewers = int(hostStringTokens[9]) if len(hostStringTokens) > 5 else 0
+                            # :jtv!jtv@jtv.tmi.twitch.tv PRIVMSG kaypikefashion :Eldirtysquirrel is now hosting you for up to 93 viewers.
+                            try:
+                                viewers = int(hostStringTokens[8]) if len(hostStringTokens) > 5 else 0
+                            except Exception as err:
+                                log2file("Error parsing host viewercount: {}".format(err.message))
+                                Parent.Log(ScriptName, "Error parsing host viewercount: {}".format(err.message))
                         else:
-                            viewers = int(hostStringTokens[10]) if len(hostStringTokens) > 5 else 0
+                            # in case of autohost
+                            # :jtv!jtv@jtv.tmi.twitch.tv PRIVMSG kaypikefashion :Eldirtysquirrel is now auto hosting you for up to 93 viewers.
+                            try:
+                                viewers = int(hostStringTokens[9]) if len(hostStringTokens) > 5 else 0
+                            except Exception as err:
+                                log2file("Error parsing auto host viewercount: {}".format(err.message))
+                                Parent.Log(ScriptName, "Error parsing auto host viewercount: {}".format(err.message))
 
                         log2file("IRCBot:: host by {0} for {1} viewers".format(hostername, viewers))
 
