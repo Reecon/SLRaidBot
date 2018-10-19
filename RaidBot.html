@@ -15,35 +15,35 @@
   <div id="app">
     <div class="container-fluid">
       <div class="accordion" id="accordionExample">
-          <div class="card" v-for="(item, i) in raidData">
-            <div class="card-header" :id="'heading'+item.name">
-              <h5 class="mb-0">
-                <button class="btn btn-link collapsed btn-block" type="button" data-toggle="collapse" :data-target="'#' + item.name" aria-expanded="false" :aria-controls="item.name">
-                    <span style="float: left;">{{ item.name }}</span>
-                    <span v-if="item.status.startsWith('live')" style="float:left; margin-left:1em; color: green; font-weight: bold;">{{ item.status }}</span>
-                    <span v-if="item.status.startsWith('rerun')" style="float:left; margin-left:1em; color: olive;">{{ item.status }}</span>
-                    <span style="float: right;padding-right: 1em; padding-left: 1em">we raided: {{ item.weraided.length }}</span>
-                    <span style="float: right;padding-left: 1em;padding-right: 1em;">raids: {{ item.raids.length }}</span>
-                    <span v-if="item.lastraided" style="float:right; margin-right:1em;">{{(new Date(item.lastraided * 1000)).toDateString()}}</span>
-                </button>
-              </h5>
-            </div>
-        
-            <div :id="item.name" class="collapse" :aria-labelledby="'heading'+item.name" data-parent="#accordionExample">
-              <div class="card-body">
-                <p v-if="item.status != 'offline'"><a :href="'https://www.twitch.tv/'+item.name" target="_blank">Go To Channel</a></p>
-                <span v-if="item.weraided.length > 0">Last 5 raids by us:</span>
-                <ul class="list-group" v-for="(raid, i) in item.weraided">
-                  <li v-if="i < 5" class="list-group-item" style="background-color: lightblue">Type: {{raid.type}} - Viewer: {{raid.viewers}} - Date: {{(new Date(raid.date * 1000)).toDateString()}}</li>
-                </ul>
-                <span v-if="item.raids.length > 0">Last 5 raids by them:</span>
-                <ul class="list-group" v-for="(raid, i) in item.raids">
-                  <li v-if="i < 5" class="list-group-item" style="background-color: rgb(153, 240, 255)">Type: {{raid.type}} - Viewer: {{raid.viewers}} - Date: {{(new Date(raid.date * 1000)).toDateString()}}</li>
-                </ul>
-              </div>
+        <div class="card" v-for="(item, i) in raidData" v-if="!hide_offline || (item.status != 'offline' && hide_offline)">
+          <div class="card-header" :id="'heading'+item.name">
+            <h5 class="mb-0">
+              <button class="btn btn-link collapsed btn-block" type="button" data-toggle="collapse" :data-target="'#' + item.name" aria-expanded="false" :aria-controls="item.name">
+                  <span style="float: left;">{{ item.name }}</span>
+                  <span v-if="item.status.startsWith('live')" style="float:left; margin-left:1em; color: green; font-weight: bold;">{{ item.status }}</span>
+                  <span v-if="item.status.startsWith('rerun')" style="float:left; margin-left:1em; color: olive;">{{ item.status }}</span>
+                  <span style="float: right;padding-right: 1em; padding-left: 1em">we raided: {{ item.weraided.length }}</span>
+                  <span style="float: right;padding-left: 1em;padding-right: 1em;">raids: {{ item.raids.length }}</span>
+                  <span v-if="item.lastraided" style="float:right; margin-right:1em;">{{(new Date(item.lastraided * 1000)).toDateString()}}</span>
+              </button>
+            </h5>
+          </div>
+      
+          <div :id="item.name" class="collapse" :aria-labelledby="'heading'+item.name" data-parent="#accordionExample">
+            <div class="card-body">
+              <p v-if="item.status != 'offline'"><a :href="'https://www.twitch.tv/'+item.name" target="_blank">Go To Channel</a></p>
+              <span v-if="item.weraided.length > 0">Last 5 raids by us:</span>
+              <ul class="list-group" v-for="(raid, i) in item.weraided">
+                <li v-if="i < 5" class="list-group-item" style="background-color: lightblue">Type: {{raid.type}} - Viewer: {{raid.viewers}} - Date: {{(new Date(raid.date * 1000)).toDateString()}}</li>
+              </ul>
+              <span v-if="item.raids.length > 0">Last 5 raids by them:</span>
+              <ul class="list-group" v-for="(raid, i) in item.raids">
+                <li v-if="i < 5" class="list-group-item" style="background-color: rgb(153, 240, 255)">Type: {{raid.type}} - Viewer: {{raid.viewers}} - Date: {{(new Date(raid.date * 1000)).toDateString()}}</li>
+              </ul>
             </div>
           </div>
         </div>
+      </div>
     </div>
   </div>
 </body>
@@ -55,6 +55,7 @@
     data: {
       raidData: [],
       client_id: "",
+      hide_offline: false,
       my_event: "",
       serviceUrl: "",
       socket: Object
@@ -133,11 +134,12 @@
         var json = JSON.parse(message.data);
 
         if(json.event == 'EVENT_RAID_DATA') {
-          
           var jsonString = json.data;
           
           var jsonData = JSON.parse(jsonString);
           vm.client_id = jsonData.client_id;
+          vm.hide_offline = jsonData.hide_offline === "true" ? true : false;
+          console.log(jsonData);
           
           // this is soooo stupid, please halp
           var raidsArray = [];

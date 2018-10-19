@@ -40,6 +40,7 @@ class RbSettings:
             self.NewTarget = ""
             self.RemoveTarget = ""
             self.hostGoal = 100
+            self.HideOffline = False
 
     def Reload(self, jsondata):
         self.__dict__ = json.loads(jsondata, encoding="utf-8")
@@ -240,6 +241,7 @@ def OpenWebsite():
     loadDatabase()
     data = rbRaidsData
     data['client_id'] = rbClientID 
+    data['hide_offline'] = "true" if rbScriptSettings.HideOffline else "false"
     dataString = json.dumps(data,indent=None)
     time.sleep(2) # wait till ui is loaded and connected
     Parent.BroadcastWsEvent("EVENT_RAID_DATA", dataString)
@@ -428,6 +430,7 @@ def updateUi():
     ui['NewTarget']['value'] = rbScriptSettings.NewTarget
     ui['RemoveTarget']['value'] = rbScriptSettings.RemoveTarget
     ui['hostGoal']['value'] = rbScriptSettings.hostGoal
+    ui['HideOffline']['value'] = rbScriptSettings.HideOffline
 
     try:
         with codecs.open(UiFilePath, encoding="utf-8-sig", mode="w+") as f:
