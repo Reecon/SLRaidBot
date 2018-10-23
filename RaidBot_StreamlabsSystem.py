@@ -25,7 +25,7 @@ ScriptName = "RaidBot"
 Website = "reecon820@gmail.com"
 Description = "Logs raids and hosts so you can keep track of"
 Creator = "Reecon820"
-Version = "0.0.4.1"
+Version = "0.0.4.2"
 
 #---------------------------
 #   Settings Handling
@@ -158,11 +158,13 @@ def Execute(data):
     #log2file("{0}: {1} - {2}".format(data.UserName, data.Message, data.RawData))
     if data.IsRawData():
         if "USERNOTICE" in data.RawData: # we get raided
-            log2file("{}".format(data.RawData))
-            if "msg-id=raid" in data.RawData:
+            #log2file("{}".format(data.RawData))
+            #@badges=subscriber/6,partner/1;color=#E96BFF;display-name=TracyDoll;emotes=;flags=;id=af6af160-61a6-40fc-8168-cb0626e0e24b;login=tracydoll;mod=0;msg-id=raid;msg-param-displayName=TracyDoll;msg-param-login=tracydoll;msg-param-profileImageURL=https://static-cdn.jtvnw.net/jtv_user_pictures/baa2b832-084d-40d7-a2d2-912f9ed191ee-profile_image-70x70.png;msg-param-viewerCount=71;room-id=62983472;subscriber=1;system-msg=71\sraiders\sfrom\sTracyDoll\shave\sjoined\n!;tmi-sent-ts=1540113328399;turbo=0;user-id=127647856;user-type= :tmi.twitch.tv USERNOTICE #kaypikefashion
+            if "msg-id=raid;" in data.RawData:
                 # get raiding channel and viewers
+                log2file("{}".format(data.RawData))
                 raiderid = re.search("user-id=\d+;", data.RawData).group(0).strip(";").split("=")[1]
-                raidername = re.search("msg-param-login=.*;", data.RawData).group(0).strip(";").split("=")[1]
+                raidername = re.search("msg-param-login=\w+;", data.RawData).group(0).strip(";").split("=")[1]
                 viewercount = re.search("msg-param-viewerCount=\d+;", data.RawData).strip(";").split("=")[1]
 
                 log2file("raid by {0} for {1} viewers".format(raidername, viewercount))
@@ -172,6 +174,7 @@ def Execute(data):
                     addRaid(raidername, "raid", viewercount, targetid=raiderid)
                 
         elif "HOSTTARGET" in data.RawData: # we host someone
+            log2file("{}".format(data.RawData))
             tokens = data.RawData.split(" ")
             targetname = tokens[3][1:]
             viewercount = int(tokens[4])
