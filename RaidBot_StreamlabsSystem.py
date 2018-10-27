@@ -158,7 +158,7 @@ def Execute(data):
     #log2file("{0}: {1} - {2}".format(data.UserName, data.Message, data.RawData))
     if data.IsRawData():
         rawTokens = data.RawData.split(' ')
-        if len(rawTokens) < 2:
+        if len(rawTokens) < 3:
             return
         if rawTokens[2] == 'USERNOTICE': # we get raided
             #log2file("{}".format(data.RawData))
@@ -176,7 +176,7 @@ def Execute(data):
                     addTargetByIdAndName(raiderid, raidername)
                     addRaid(raidername, "raid", viewercount, targetid=raiderid)
                 
-        elif rawTokens[2] == "HOSTTARGET": # we host someone
+        elif rawTokens[1] == "HOSTTARGET": # we host someone
             log2file("{}".format(data.RawData))
             targetname = rawTokens[3][1:]
             viewercount = int(rawTokens[4])
