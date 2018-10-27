@@ -157,7 +157,7 @@ def Init():
 def Execute(data):
     #log2file("{0}: {1} - {2}".format(data.UserName, data.Message, data.RawData))
     if data.IsRawData():
-        rawTokens = data.rawData.split(' ')
+        rawTokens = data.RawData.split(' ')
         if rawTokens[2] == 'USERNOTICE': # we get raided
             #log2file("{}".format(data.RawData))
             #@badges=subscriber/6,partner/1;color=#E96BFF;display-name=TracyDoll;emotes=;flags=;id=af6af160-61a6-40fc-8168-cb0626e0e24b;login=tracydoll;mod=0;msg-id=raid;msg-param-displayName=TracyDoll;msg-param-login=tracydoll;msg-param-profileImageURL=https://static-cdn.jtvnw.net/jtv_user_pictures/baa2b832-084d-40d7-a2d2-912f9ed191ee-profile_image-70x70.png;msg-param-viewerCount=71;room-id=62983472;subscriber=1;system-msg=71\sraiders\sfrom\sTracyDoll\shave\sjoined\n!;tmi-sent-ts=1540113328399;turbo=0;user-id=127647856;user-type= :tmi.twitch.tv USERNOTICE #kaypikefashion
