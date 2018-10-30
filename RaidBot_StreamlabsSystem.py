@@ -25,7 +25,7 @@ ScriptName = "RaidBot"
 Website = "reecon820@gmail.com"
 Description = "Logs raids and hosts so you can keep track of"
 Creator = "Reecon820"
-Version = "0.0.4.3"
+Version = "0.0.4.4"
 
 #---------------------------
 #   Settings Handling
@@ -165,10 +165,15 @@ def Execute(data):
             #@badges=subscriber/6,partner/1;color=#E96BFF;display-name=TracyDoll;emotes=;flags=;id=af6af160-61a6-40fc-8168-cb0626e0e24b;login=tracydoll;mod=0;msg-id=raid;msg-param-displayName=TracyDoll;msg-param-login=tracydoll;msg-param-profileImageURL=https://static-cdn.jtvnw.net/jtv_user_pictures/baa2b832-084d-40d7-a2d2-912f9ed191ee-profile_image-70x70.png;msg-param-viewerCount=71;room-id=62983472;subscriber=1;system-msg=71\sraiders\sfrom\sTracyDoll\shave\sjoined\n!;tmi-sent-ts=1540113328399;turbo=0;user-id=127647856;user-type= :tmi.twitch.tv USERNOTICE #kaypikefashion
             if re.search("msg-id=raid;", rawTokens[0]):
                 # get raiding channel and viewers
-                log2file("{}".format(data.RawData))
+                #log2file("{}".format(data.RawData))
                 raiderid = re.search("user-id=\d+;", rawTokens[0]).group(0).strip(";").split("=")[1]
                 raidername = re.search("msg-param-login=\w+;", rawTokens[0]).group(0).strip(";").split("=")[1]
                 viewercount = re.search("msg-param-viewerCount=\d+;", rawTokens[0]).group(0).strip(";").split("=")[1]
+                try:
+                    viewercount = int(viewercount)
+                except Exception as err:
+                    log2file("Error parsing raid viewer number: {}".format(err.message))
+                    Parent.Log(ScriptName, "Error parsing raid viewer number: {}".format(err.message))
 
                 log2file("raid by {0} ({1}) for {2} viewers".format(raidername, raiderid, viewercount))
                 
@@ -177,7 +182,7 @@ def Execute(data):
                     addRaid(raidername, "raid", viewercount, targetid=raiderid)
                 
         elif rawTokens[1] == "HOSTTARGET": # we host someone
-            log2file("{}".format(data.RawData))
+            #log2file("{}".format(data.RawData))
             targetname = rawTokens[3][1:]
             viewercount = int(rawTokens[4])
             #Parent.Log(ScriptName, "target: {0} - viewers: {1}".format(targetname, viewercount))
@@ -186,8 +191,9 @@ def Execute(data):
                 targetUserId = getUserId(targetname)
                 addTargetByIdAndName(targetUserId, targetname)
                 addWeRaided(targetname, "host", viewercount, targetid=targetUserId)
+                log2file("we hosted {0} ({1}) for {2} viewers".format(targetname, targetUserId, viewercount))
         
-        # we raid someone
+        # we raid someone (probably not communicated through chat)
 
     return
 
@@ -510,6 +516,7 @@ class IRCBot(threading.Thread):
                         if line[0] != '#':
                             self.pw = line
         except Exception as err:
+            log2file("Error reading OAuth file: {0}".format(err))
             Parent.Log(ScriptName, "Error reading OAuth file: {0}".format(err))
         
         
@@ -533,7 +540,7 @@ class IRCBot(threading.Thread):
         print(self.ircsock.send(("JOIN "+ chan + "\n").encode("UTF-8")))
     
     def pong(self):
-        log2file("IRCBot:: pong")
+        #log2file("IRCBot:: pong")
         print(self.ircsock.send(("PONG :Pong\n").encode("UTF-8")))
         
     def sendmsg(self, chan, msg):
@@ -576,10 +583,10 @@ class IRCBot(threading.Thread):
                 #only consume host notifications
                 if re.search(":jtv.*:.*is\snow\shosting\syou", ircmsg):
                     # :jtv!jtv@jtv.tmi.twitch.tv PRIVMSG reecon820 :care_o_bot is now hosting you.
-                    log2file("IRCBot:: {}".format(ircmsg))
+                    #log2file("IRCBot:: {}".format(ircmsg))
                     message = ircmsg
 
-                    if re.search(":jtv!.*:.*is\snow\shosting\syou", message):# or (rbScriptSettings.autoHosts and re.search("is\snow\sauto\shosting\syou", message)):
+                    if re.search(":jtv!.*:.*is\snow\shosting\syou", message):# or (rbScriptSettings.autoHosts and re.search("is\snow\sauto\shosting\syou", message)): # autohost message not sent anymore
                         hostType = "host" if re.search(":jtv.*:.*is\snow\shosting\syou", message) else "autohost"
                         hostStringTokens = message.split(":")[2].split(" ")
                         hostername = hostStringTokens[0]
@@ -592,8 +599,8 @@ class IRCBot(threading.Thread):
                                 log2file("Error parsing host viewercount: {}".format(err.message))
                                 Parent.Log(ScriptName, "Error parsing host viewercount: {}".format(err.message))
                         else:
-                            # in case of autohost
-                            # :jtv!jtv@jtv.tmi.twitch.tv PRIVMSG kaypikefashion :Eldirtysquirrel is now auto hosting you for up to 93 viewers.
+                            # in case of autohost 
+                            # :jtv!jtv@jtv.tmi.twitch.tv PRIVMSG kaypikefashion :reecon820 is now auto hosting you for up to 3 viewers.
                             try:
                                 viewers = int(hostStringTokens[9]) if len(hostStringTokens) > 5 else 0
                             except Exception as err:
