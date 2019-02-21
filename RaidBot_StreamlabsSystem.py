@@ -25,7 +25,7 @@ ScriptName = "RaidBot"
 Website = "reecon820@gmail.com"
 Description = "Logs raids and hosts so you can keep track of"
 Creator = "Reecon820"
-Version = "0.0.4.4"
+Version = "0.0.4.5"
 
 #---------------------------
 #   Settings Handling
@@ -167,7 +167,7 @@ def Execute(data):
                 # get raiding channel and viewers
                 #log2file("{}".format(data.RawData))
                 raiderid = re.search("user-id=\d+;", rawTokens[0]).group(0).strip(";").split("=")[1]
-                raidername = re.search("msg-param-login=\w+;", rawTokens[0]).group(0).strip(";").split("=")[1]
+                raidername = re.search("msg-param-login=\w+;", rawTokens[0]).group(0).strip(";").split("=")[1].lower()
                 viewercount = re.search("msg-param-viewerCount=\d+;", rawTokens[0]).group(0).strip(";").split("=")[1]
                 try:
                     viewercount = int(viewercount)
@@ -183,7 +183,7 @@ def Execute(data):
                 
         elif rawTokens[1] == "HOSTTARGET": # we host someone
             #log2file("{}".format(data.RawData))
-            targetname = rawTokens[3][1:]
+            targetname = rawTokens[3][1:].lower()
             viewercount = int(rawTokens[4])
             #Parent.Log(ScriptName, "target: {0} - viewers: {1}".format(targetname, viewercount))
 
@@ -589,7 +589,7 @@ class IRCBot(threading.Thread):
                     if re.search(":jtv!.*:.*is\snow\shosting\syou", message):# or (rbScriptSettings.autoHosts and re.search("is\snow\sauto\shosting\syou", message)): # autohost message not sent anymore
                         hostType = "host" if re.search(":jtv.*:.*is\snow\shosting\syou", message) else "autohost"
                         hostStringTokens = message.split(":")[2].split(" ")
-                        hostername = hostStringTokens[0]
+                        hostername = hostStringTokens[0].lower()
                         viewers = 0
                         if hostType == "host":
                             # :jtv!jtv@jtv.tmi.twitch.tv PRIVMSG kaypikefashion :Eldirtysquirrel is now hosting you for up to 93 viewers.
