@@ -146,7 +146,7 @@
           // this is soooo stupid, please halp
           var raidsArray = [];
           for (i in jsonData) {
-            if (i != 'client_id' && i != 'hide_offline') {
+            if (i != 'client_id' && i != 'hide_offline' && i != 'track_activity') {
               var obj = {};
               obj['name'] = i;
               obj['userid'] = jsonData[i].userid;
