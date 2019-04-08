@@ -23,9 +23,9 @@ import sqlite3
 #---------------------------
 ScriptName = "RaidBot"
 Website = "reecon820@gmail.com"
-Description = "Logs raids and hosts so you can keep track of"
+Description = "Logs raids and hosts so you can keep track of potential raid targets"
 Creator = "Reecon820"
-Version = "0.0.4.5"
+Version = "0.0.5.0"
 
 #---------------------------
 #   Settings Handling
@@ -41,6 +41,7 @@ class RbSettings:
             self.RemoveTarget = ""
             self.hostGoal = 100
             self.HideOffline = False
+            self.TrackActivity = True
 
     def Reload(self, jsondata):
         self.__dict__ = json.loads(jsondata, encoding="utf-8")
@@ -254,6 +255,7 @@ def OpenWebsite():
     data = rbRaidsData
     data['client_id'] = rbClientID 
     data['hide_offline'] = "true" if rbScriptSettings.HideOffline else "false"
+    data['track_activity'] = "true" if rbScriptSettings.TrackActivity else "false"
     dataString = json.dumps(data,indent=None)
     time.sleep(2) # wait till ui is loaded and connected
     Parent.BroadcastWsEvent("EVENT_RAID_DATA", dataString)
@@ -265,7 +267,7 @@ def loadDatabase():
         conn = sqlite3.connect(rbDatabase)
         # create database structure
         c = conn.cursor()
-        c.execute('CREATE TABLE targets (userid INTEGER PRIMARY KEY, username INTEGER, lastraid INTEGER, lastraided INTEGER)')
+        c.execute('CREATE TABLE targets (userid INTEGER PRIMARY KEY, username TEXT, lastraid INTEGER, lastraided INTEGER, msgcount INTEGER, lastseen INTEGER)')
         c.execute('CREATE TABLE raids (raidid INTEGER PRIMARY KEY, username TEXT, type TEXT, viewers INTEGER, date INTEGER)')
         c.execute('CREATE TABLE weraided (raidid INTEGER PRIMARY KEY, username TEXT, type TEXT, viewers INTEGER, date INTEGER)')
         conn.commit()
@@ -279,7 +281,7 @@ def loadDatabase():
     # get all targets
     c.execute('SELECT * FROM targets')
     for row in c.fetchall():
-        data[row[1]] = {"userid":row[0], "lastraid":row[2], "lastraided":row[3]}
+        data[row[1]] = {"userid":row[0], "lastraid":row[2], "lastraided":row[3], "msgcount":row[4], "lastseen": row[5]}
     
     # add all raids to the targets
     c.execute('SELECT * FROM raids')
@@ -400,6 +402,21 @@ def addWeRaided(targetname, raidtype, viewers, timestamp="now", targetid=None):
     conn.close()
     return
 
+# to update the message count of a target when they say something in chat
+def incrementMessageCount(userid, targetname):
+    conn = sqlite3.connect(rbDatabase)
+    c = conn.cursor()
+    timestamp  = int((datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
+    try:
+        uid = int(userid)
+        c.execute('INSERT OR IGNORE INTO targets (userid, username, msgcount) VALUES({0}, "{1}", {2})'.format(uid, targetname, 0))
+        c.execute('UPDATE OR IGNORE targets SET msgcount = msgcount + 1, lastseen = {0} WHERE userid = {1}'.format(timestamp, uid))
+    except Exception as err:
+        Parent.Log(ScriptName, "Error incrementing message count: {0}".format(err))
+    conn.commit()
+    conn.close()
+    return
+
 # lookup the twitch userid for a given username
 def getUserId(username):
     headers = {'Client-ID': rbClientID, 'Accept': 'application/vnd.twitchtv.v5+json'}
@@ -443,6 +460,7 @@ def updateUi():
     ui['RemoveTarget']['value'] = rbScriptSettings.RemoveTarget
     ui['hostGoal']['value'] = rbScriptSettings.hostGoal
     ui['HideOffline']['value'] = rbScriptSettings.HideOffline
+    ui['TrackActivity']['value'] = rbScriptSettings.TrackActivity
 
     try:
         with codecs.open(UiFilePath, encoding="utf-8-sig", mode="w+") as f:
@@ -532,6 +550,10 @@ class IRCBot(threading.Thread):
         print(self.ircsock.send(("PASS " + self.pw + "\n").encode("UTF-8")))
         log2file("IRCBot:: nick")
         print(self.ircsock.send(("NICK " + self.user + "\n").encode("UTF-8")))
+        log2file("IRCBot:: CAP REQ")
+        print(self.ircsock.send(('CAP REQ :twitch.tv/membership\n').encode("UTF-8")))
+        print(self.ircsock.send(('CAP REQ :twitch.tv/tags\n').encode("UTF-8")))
+        print(self.ircsock.send(('CAP REQ :twitch.tv/commands\n').encode("UTF-8")))
         self.join_channel_(self.hostchannel)
         log2file("IRCBot:: connected to " + self.hostchannel)
     
@@ -614,5 +636,23 @@ class IRCBot(threading.Thread):
                             hosterId = getUserId(hostername)    # only poll api once per host, this is bad enough
                             addTargetByIdAndName(hosterId, hostername)
                             addRaid(hostername, hostType, viewers, targetid=hosterId)
+                elif rbScriptSettings.TrackActivity and 'PRIVMSG' in ircmsg:
+                    # check if the message is from a partnered streamer but ignore the broadcaster
+                    tags = ircmsg.split(" ")[0]
+                    if 'partner/1' in tags and not 'broadcaster/1'in tags:
+
+                        # get user name and user id from the message tags
+                        splitTags = tags.split(";")
+                        targetname = ""
+                        userid = ""
+                        for t in splitTags:
+                          if t.startswith("display-name="):
+                            targetname = t.split("=")[1].lower()
+                          elif t.startswith("user-id="):
+                            userid = t.split("=")[1]
+                        
+                        # increment the message count in the database
+                        incrementMessageCount(userid, targetname)
+
         self.shutdown()
                     

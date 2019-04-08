@@ -27,6 +27,13 @@
         "type": "textbox", 
         "value": ""
     }, 
+    "TrackActivity": {
+        "group": "Core", 
+        "label": "Track chat activity of partners", 
+        "tooltip": "Check to track the chat activity of partnered streamers to see potential raid targets", 
+        "type": "checkbox", 
+        "value": true
+    }, 
     "btnOpen": {
         "function": "OpenWebsite", 
         "group": "Core", 

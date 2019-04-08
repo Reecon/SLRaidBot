@@ -24,7 +24,9 @@
                   <span v-if="item.status.startsWith('rerun')" style="float:left; margin-left:1em; color: olive;">{{ item.status }}</span>
                   <span style="float: right;padding-right: 1em; padding-left: 1em">we raided: {{ item.weraided.length }}</span>
                   <span style="float: right;padding-left: 1em;padding-right: 1em;">raids: {{ item.raids.length }}</span>
-                  <span v-if="item.lastraided" style="float:right; margin-right:1em;">{{(new Date(item.lastraided * 1000)).toDateString()}}</span>
+                  <span v-if="item.msgcount && track_activity" style="float: right;padding-right: 1em; padding-left: 1em">messages: {{ item.msgcount }}</span>
+                  <span v-if="item.lastseen && track_activity" style="float: right;padding-right: 1em; padding-left: 1em">last seen: {{ (new Date(item.lastseen * 1000)).toDateString() }}</span>
+                  <span v-if="item.lastraided" style="float:right; margin-right:1em;">last raided: {{(new Date(item.lastraided * 1000)).toDateString()}}</span>
               </button>
             </h5>
           </div>
@@ -54,6 +56,7 @@
       raidData: [],
       client_id: "",
       hide_offline: false,
+      track_activity: true,
       my_event: "",
       serviceUrl: "",
       socket: Object
@@ -137,6 +140,7 @@
           var jsonData = JSON.parse(jsonString);
           vm.client_id = jsonData.client_id;
           vm.hide_offline = jsonData.hide_offline === "true" ? true : false;
+          vm.track_activity = jsonData.track_activity === "true" ? true : false;
           console.log(jsonData);
           
           // this is soooo stupid, please halp
@@ -148,6 +152,8 @@
               obj['userid'] = jsonData[i].userid;
               obj['lastraid'] = jsonData[i].lastraid;
               obj['lastraided'] = jsonData[i].lastraided;
+              obj['msgcount'] = jsonData[i].msgcount;
+              obj['lastseen'] = jsonData[i].lastseen;
 
               var raided = [];
               for (raid in jsonData[i].weraided) {
