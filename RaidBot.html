@@ -24,9 +24,9 @@
                   <span v-if="item.status.startsWith('rerun')" style="float:left; margin-left:1em; color: olive;">{{ item.status }}</span>
                   <span style="float: right;padding-right: 1em; padding-left: 1em">we raided: {{ item.weraided.length }}</span>
                   <span style="float: right;padding-left: 1em;padding-right: 1em;">raids: {{ item.raids.length }}</span>
+                  <span v-if="item.lastraided" style="float:right; margin-right:1em;">last raided: {{(new Date(item.lastraided * 1000)).toDateString()}}</span>
                   <span v-if="item.msgcount && track_activity" style="float: right;padding-right: 1em; padding-left: 1em">messages: {{ item.msgcount }}</span>
                   <span v-if="item.lastseen && track_activity" style="float: right;padding-right: 1em; padding-left: 1em">last seen: {{ (new Date(item.lastseen * 1000)).toDateString() }}</span>
-                  <span v-if="item.lastraided" style="float:right; margin-right:1em;">last raided: {{(new Date(item.lastraided * 1000)).toDateString()}}</span>
               </button>
             </h5>
           </div>

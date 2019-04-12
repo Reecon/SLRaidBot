@@ -25,7 +25,7 @@ ScriptName = "RaidBot"
 Website = "reecon820@gmail.com"
 Description = "Logs raids and hosts so you can keep track of potential raid targets"
 Creator = "Reecon820"
-Version = "0.0.5.0"
+Version = "0.0.5.1"
 
 #---------------------------
 #   Settings Handling
@@ -267,7 +267,7 @@ def loadDatabase():
         conn = sqlite3.connect(rbDatabase)
         # create database structure
         c = conn.cursor()
-        c.execute('CREATE TABLE targets (userid INTEGER PRIMARY KEY, username TEXT, lastraid INTEGER, lastraided INTEGER, msgcount INTEGER, lastseen INTEGER)')
+        c.execute('CREATE TABLE targets (userid INTEGER PRIMARY KEY, username TEXT, lastraid INTEGER, lastraided INTEGER, msgcount INTEGER DEFAULT 0, lastseen INTEGER)')
         c.execute('CREATE TABLE raids (raidid INTEGER PRIMARY KEY, username TEXT, type TEXT, viewers INTEGER, date INTEGER)')
         c.execute('CREATE TABLE weraided (raidid INTEGER PRIMARY KEY, username TEXT, type TEXT, viewers INTEGER, date INTEGER)')
         conn.commit()
@@ -375,7 +375,8 @@ def addRaid(targetname, raidtype, viewers, timestamp="now", targetid=None):
         if not targetid:
             userid = getUserId(targetname)
 
-        c.execute('INSERT OR REPLACE INTO targets (userid, username, lastraid) VALUES({0}, "{1}", {2})'.format(userid, targetname, timestamp))
+        c.execute('INSERT OR IGNORE INTO targets (userid, username) VALUES({0}, "{1}")'.format(userid, targetname))
+        c.execute('UPDATE OR IGNORE targets SET lastraid = {0} WHERE userid = {1}'.format(timestamp, userid))
     except Exception as err:
         Parent.Log(ScriptName, "Error adding raid: {0}".format(err))
 
@@ -395,7 +396,8 @@ def addWeRaided(targetname, raidtype, viewers, timestamp="now", targetid=None):
         if not targetid:
             userid = getUserId(targetname)
 
-        c.execute('INSERT OR REPLACE INTO targets (userid, username, lastraided) VALUES({0}, "{1}", {2})'.format(userid, targetname, timestamp))
+        c.execute('INSERT OR IGNORE INTO targets (userid, username) VALUES({0}, "{1}")'.format(userid, targetname))
+        c.execute('UPDATE OR IGNORE targets SET lastraided = {0} WHERE userid = {1}'.format(timestamp, userid))
     except Exception as err:
         Parent.Log(ScriptName, "Error adding 'we raided': {0}".format(err))
     conn.commit()
