@@ -22,6 +22,8 @@
                   <span style="float: left;">{{ item.name }}</span>
                   <span v-if="item.status.startsWith('live')" style="float:left; margin-left:1em; color: green; font-weight: bold;">{{ item.status }}</span>
                   <span v-if="item.status.startsWith('rerun')" style="float:left; margin-left:1em; color: olive;">{{ item.status }}</span>
+                  <span style="float: left; margin-left:1em; text-transform: uppercase;">{{ item.language }}</span>
+                  <span v-if="item.mature" style="float: left; margin-left:1em; color: darkred; font-weight: bold;">m</span>
                   <span style="float: right;padding-right: 1em; padding-left: 1em">we raided: {{ item.weraided.length }}</span>
                   <span style="float: right;padding-left: 1em;padding-right: 1em;">raids: {{ item.raids.length }}</span>
                   <span v-if="item.lastraided" style="float:right; margin-right:1em;">last raided: {{(new Date(item.lastraided * 1000)).toDateString()}}</span>
@@ -81,12 +83,16 @@
             var viewers = response.body.streams[stream].viewers;
             var type = response.body.streams[stream].stream_type;
             var chanId = response.body.streams[stream].channel._id;
+            var language = response.body.streams[stream].channel.broadcaster_language;
+            var mature = response.body.streams[stream].channel.mature;
             
             var status = type + " - " + game + " - for " + viewers + " viewers";
 
             for (i in this.raidData) {
               if (this.raidData[i].userid === chanId) {
                 this.raidData[i].status = status
+                this.raidData[i].language = language;
+                this.raidData[i].mature = mature;
                 break;
               }
             }
