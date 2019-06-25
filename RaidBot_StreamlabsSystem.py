@@ -25,7 +25,7 @@ ScriptName = "RaidBot"
 Website = "reecon820@gmail.com"
 Description = "Logs raids and hosts so you can keep track of potential raid targets"
 Creator = "Reecon820"
-Version = "0.0.5.1"
+Version = "0.0.6.0"
 
 #---------------------------
 #   Settings Handling
