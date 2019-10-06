@@ -25,7 +25,7 @@ ScriptName = "RaidBot"
 Website = "reecon820@gmail.com"
 Description = "Logs raids and hosts so you can keep track of potential raid targets"
 Creator = "Reecon820"
-Version = "0.0.6.0"
+Version = "0.0.7.0"
 
 #---------------------------
 #   Settings Handling
@@ -124,8 +124,8 @@ def Init():
 
     # get channel user id
     userid = '0'
-    headers = {'Client-ID': rbClientID, 'Accept': 'application/vnd.twitchtv.v5+json'}
-    result = Parent.GetRequest("https://api.twitch.tv/kraken/users?login={0}".format(Parent.GetChannelName().lower()), headers)
+    headers = {'Client-ID': rbClientID}
+    result = Parent.GetRequest("https://api.twitch.tv/helix/users?login={0}".format(Parent.GetChannelName().lower()), headers)
     
     jsonResult = json.loads(result)
     if jsonResult['status'] != 200:
@@ -133,9 +133,9 @@ def Init():
         return
     else:
         jsonResult = json.loads(jsonResult['response'])
-        if jsonResult['users']:
-            jsonResult = jsonResult['users'][0]
-            userid = jsonResult['_id']
+        if jsonResult['data']:
+            jsonResult = jsonResult['data'][0]
+            userid = jsonResult['id']
 
     # set up and start timer
     global rbStopTimerEvent
@@ -421,8 +421,8 @@ def incrementMessageCount(userid, targetname):
 
 # lookup the twitch userid for a given username
 def getUserId(username):
-    headers = {'Client-ID': rbClientID, 'Accept': 'application/vnd.twitchtv.v5+json'}
-    result = Parent.GetRequest("https://api.twitch.tv/kraken/users?login={0}".format(username.lower()), headers)
+    headers = {'Client-ID': rbClientID}
+    result = Parent.GetRequest("https://api.twitch.tv/helix/users?login={0}".format(username.lower()), headers)
     jsonResult = json.loads(result)
 
     if jsonResult['status'] != 200:
@@ -430,12 +430,12 @@ def getUserId(username):
         return
     else:
         jsonResult = json.loads(jsonResult['response'])
-        if jsonResult['users']:
-            jsonResult = jsonResult['users'][0]
+        if jsonResult['data']:
+            jsonResult = jsonResult['data'][0]
         else:
             Parent.Log(ScriptName, "Unknown Twitch Username")
             return
-    return int(jsonResult['_id'])
+    return int(jsonResult['id'])
 
 def copyOverlayPath():
     command = "echo " + rbHostOverlayPath + " | clip"
@@ -492,7 +492,7 @@ class RbApiTimer(threading.Thread):
         while not self.stopped.wait(60.0):
             # make api call
             timerHeaders = {'Accept': 'application/json'}
-            timerResult = Parent.GetRequest("https://tmi.twitch.tv/hosts?&target={0}".format(self.id), timerHeaders)
+            timerResult = Parent.GetRequest("https://tmi.twitch.tv/hosts?target={0}".format(self.id), timerHeaders)
             timerJsonResult = json.loads(timerResult)
             
             if timerJsonResult['status'] == 200:
